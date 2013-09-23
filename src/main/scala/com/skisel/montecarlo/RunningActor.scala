@@ -20,12 +20,10 @@ class RunningActor extends Actor {
   }
 
   def aggregateStructure(outs: => List[(Int, List[Loss])]): List[(Int, Double)] = {
-    for {
-      l <- outs
-    } yield {
-      (l._1, applyStructure(l._2))
+    outs map {
+      x => (x._1,applyStructure(x._2))
     }
-  }  
+  }
 
   def receive = {
     case portfolioRequest: SimulatePortfolioRequest => {
@@ -59,8 +57,8 @@ class RunningActor extends Actor {
   }
 
   def simulation(portfolioRequest: SimulationProtocol.SimulatePortfolioRequest): List[(Int, List[Loss])] = {
-    (for {
-      eventId <- portfolioRequest.from to portfolioRequest.to
-    } yield (eventId, simulation(portfolioRequest.req))).toList
+    ((portfolioRequest.from to portfolioRequest.to) map {
+      x => (x,simulation(portfolioRequest.req))
+    }).toList
   }
 }
