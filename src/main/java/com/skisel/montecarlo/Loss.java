@@ -3,14 +3,15 @@ package com.skisel.montecarlo;
 import java.io.Serializable;
 
 public class Loss implements Serializable {
-    private double lossAmount;
+    private double amount;
 
-    public double getLossAmount() {
-        return lossAmount;
+    public double getAmount() {
+        return amount;
     }
 
-    public void setLossAmount(double lossAmount) {
-        this.lossAmount = lossAmount;
+    public void setAmount(double amount) {
+        this.amount = amount;
     }
+
 }
 
