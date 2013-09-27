@@ -1,5 +1,6 @@
 package com.skisel.montecarlo;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class MonteCarloSimulator {
@@ -7,9 +8,13 @@ public class MonteCarloSimulator {
     private Simulation dealPortfolioCalculator;
     private Simulation dealPlusBackgroundPortfolioCalculator;
 
-    public MonteCarloSimulator() throws Exception {
-        dealPortfolioCalculator = new Simulation();
-        dealPlusBackgroundPortfolioCalculator = new Simulation();
+    private ArrayList<Risk> risks;
+
+    public MonteCarloSimulator(Input input) throws Exception {
+        this.risks = new ArrayList<Risk>();
+        risks.addAll(input.getRisks());
+        dealPortfolioCalculator = new Simulation(risks);
+        dealPlusBackgroundPortfolioCalculator = new Simulation(risks);
     }
     
     public List<Loss> simulateDeal() throws Exception {
@@ -19,6 +24,8 @@ public class MonteCarloSimulator {
     public List<Loss> simulateBackground() throws Exception {
         return dealPlusBackgroundPortfolioCalculator.calculate();
     }
-    
-    
+
+    public ArrayList<Risk> getRisks() {
+        return risks;
+    }
 }

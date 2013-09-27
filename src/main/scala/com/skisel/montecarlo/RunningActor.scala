@@ -8,15 +8,15 @@ import com.skisel.montecarlo.SimulationProtocol._
 
 class RunningActor extends Actor {
 
-  def simulation(request: SimulationRequest): List[Loss] = {
+  def simulation(request: SimulationRequest, sim: MonteCarloSimulator): List[Loss] = {
     request match {
-      case SimulateDealPortfolio(_, sim: MonteCarloSimulator) => sim.simulateDeal().asScala.toList
-      case SimulateBackgroundPortfolio(_, sim: MonteCarloSimulator) => sim.simulateBackground().asScala.toList
+      case SimulateDealPortfolio(_, _) => sim.simulateDeal().asScala.toList
+      case SimulateBackgroundPortfolio(_, _) => sim.simulateBackground().asScala.toList
     }
   }
 
   def applyStructure(losses: List[Loss]): Double = {
-    losses.foldRight(0.0)((loss, sum) => sum + loss.getLossAmount)
+    losses.foldRight(0.0)(_.getAmount+_)
   }
 
   def aggregateStructure(outs: => List[(Int, List[Loss])]): List[(Int, Double)] = {
@@ -28,8 +28,9 @@ class RunningActor extends Actor {
   def receive = {
     case portfolioRequest: SimulatePortfolioRequest => {
       System.out.println("from:" + portfolioRequest.from + " to:" + portfolioRequest.to + " req:" + portfolioRequest.req.getClass.getSimpleName)
-      val outs: List[(Int, List[Loss])] = simulation(portfolioRequest)
-      store(outs)
+      val sim = new MonteCarloSimulator(portfolioRequest.req.inp)
+      val outs: List[(Int, List[Loss])] = simulation(portfolioRequest,sim)
+      //store(outs)
       sender ! AggregationResults(aggregateStructure(outs), portfolioRequest)
 
     }
@@ -56,9 +57,9 @@ class RunningActor extends Actor {
     stream.close()
   }
 
-  def simulation(portfolioRequest: SimulationProtocol.SimulatePortfolioRequest): List[(Int, List[Loss])] = {
+  def simulation(portfolioRequest: SimulationProtocol.SimulatePortfolioRequest, sim: MonteCarloSimulator): List[(Int, List[Loss])] = {
     ((portfolioRequest.from to portfolioRequest.to) map {
-      x => (x,simulation(portfolioRequest.req))
+      x => (x,simulation(portfolioRequest.req, sim))
     }).toList
   }
 }

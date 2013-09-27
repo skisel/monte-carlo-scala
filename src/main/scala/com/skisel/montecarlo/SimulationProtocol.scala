@@ -1,7 +1,6 @@
 package com.skisel.montecarlo
 
 import akka.actor.ActorRef
-import com.skisel.montecarlo.MonteCarloSimulator
 
 object SimulationProtocol {
 
@@ -10,14 +9,14 @@ object SimulationProtocol {
   }
   
   abstract class SimulationRequest() extends Request{
-    def sim: MonteCarloSimulator
+    def inp: Input
   }
 
   case class LoadRequest(numOfSimulations: Int) extends Request
 
-  case class SimulateDealPortfolio(numOfSimulations: Int, sim: MonteCarloSimulator) extends SimulationRequest
+  case class SimulateDealPortfolio(numOfSimulations: Int, inp: Input) extends SimulationRequest
   
-  case class SimulateBackgroundPortfolio(numOfSimulations: Int, sim: MonteCarloSimulator) extends SimulationRequest
+  case class SimulateBackgroundPortfolio(numOfSimulations: Int, inp: Input) extends SimulationRequest
   
   abstract class PortfolioRequest() {
     def requestor: ActorRef
@@ -30,5 +29,6 @@ object SimulationProtocol {
   case class LoadPortfolioRequest(requestor: ActorRef, from: Int, req: LoadRequest) extends PortfolioRequest
 
   case class AggregationResults(eventIdToAmount: List[(Int, Double)], req: PortfolioRequest)
-  
+
+  case class SimulationStatistics(simulationLoss: Double, simulationLossReduced: Double, hittingRatio: Double, reducedDistribution: List[Double])
 }
