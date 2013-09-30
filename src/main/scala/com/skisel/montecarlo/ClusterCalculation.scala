@@ -14,15 +14,10 @@ import akka.actor.RelativeActorPath
 import akka.cluster.Cluster
 import akka.cluster.ClusterEvent._
 import akka.cluster.MemberStatus
-import akka.routing.FromConfig
 import com.skisel.montecarlo.SimulationProtocol._
 import akka.cluster.ClusterEvent.MemberUp
-import com.skisel.montecarlo.SimulationProtocol.AggregationResults
-import com.skisel.montecarlo.SimulationProtocol.SimulatePortfolioRequest
-import com.skisel.montecarlo.SimulationProtocol.LoadPortfolioRequest
 import akka.actor.RootActorPath
 import akka.cluster.ClusterEvent.CurrentClusterState
-import com.skisel.montecarlo.SimulationProtocol.LoadRequest
 import akka.cluster.ClusterEvent.UnreachableMember
 import akka.util.Timeout
 import scala.collection.JavaConverters._
@@ -30,76 +25,60 @@ import akka.pattern.ask
 
 //#imports
 
+//seed 2551
+//seed 2552
+//worker
+//client
 
-class PartitioningActor extends Actor {
-
-  val actor = context.actorOf(Props[RunningActor].withRouter(FromConfig), name = "workerRouter")
-  private[this] var outstandingRequests = Map.empty[Int, Double]
-
-  def partitions(numOfSimulation: Int): Iterator[IndexedSeq[Int]] = {
-    (1 to numOfSimulation).grouped(1000)
-  }
-
-  def receive = {
-    case simulationRequest: SimulationRequest => {
-      for (part <- partitions(simulationRequest.numOfSimulations)) {
-        actor ! SimulatePortfolioRequest(sender, part.head, part.last, simulationRequest)
-      }
-    }
-    case loadRequest: LoadRequest => {
-      for (part <- partitions(loadRequest.numOfSimulations)) {
-        actor ! LoadPortfolioRequest(sender, part.head, loadRequest)
-      }
-    }
-
-    case AggregationResults(eventIdToAmount, request: PortfolioRequest) => {
-      for (tuple: (Int, Double) <- eventIdToAmount) {
-        outstandingRequests += tuple._1 -> tuple._2
-      }
-      if (outstandingRequests.size == request.req.numOfSimulations) {
-        val distribution: List[Double] = outstandingRequests.toList.map(_._2).sorted
-        val simulationLoss: Double = distribution.foldRight(0.0)(_ + _) / request.req.numOfSimulations
-        val dropTo = request.req.numOfSimulations / 1000
-        val reducedDistribution: List[Double] = dropFunctional(dropTo, distribution)
-        val reducedSimulationLoss: Double = reducedDistribution.foldRight(0.0)(_ + _) / 1000
-        val hittingRatio: Double = distribution.count(_ > 0).toDouble / request.req.numOfSimulations.toDouble
-        request.requestor ! SimulationStatistics(simulationLoss, reducedSimulationLoss, hittingRatio, reducedDistribution)
-      }
-    }
-
-    case _ => println("Something failed PartitioningActor ")
-  }
-
-  def dropFunctional[A](n: Int, ls: List[A]): List[A] =
-     ls.zipWithIndex filter {
-       v => (v._2 + 1) % n == 0
-     } map {
-       _._1
-     }
-
-}
-
-object ClusterCalculation {
+object Launcher {
   def main(args: Array[String]): Unit = {
-    // Override the configuration of the port when specified as program argument
+    val arguments: List[String] = args.head.split(" ").toList
+    arguments match {
+      case "seed" :: Nil => println("please define port number")
+      case "seed" :: tail => seed(tail.head)
+      case "worker" :: Nil => worker()
+      case "client" :: Nil => println("please define num of simulations")
+      case "client" :: tail => client(tail.head.toInt)
+      case _ => println("error")
+    }
+  }
+
+  def seed(port: String) {
     val config =
-      (if (args.nonEmpty) ConfigFactory.parseString(s"akka.remote.netty.tcp.port=${args(0)}")
-      else ConfigFactory.empty).withFallback(
-        ConfigFactory.parseString("akka.cluster.roles = [compute]")).
-        withFallback(ConfigFactory.load())
+      ConfigFactory.parseString(s"akka.remote.netty.tcp.port=${port}")
+        .withFallback(ConfigFactory.parseString("akka.cluster.roles = [compute]"))
+        .withFallback(ConfigFactory.parseString(s"atmos.trace.node = seed ${port}"))
+        .withFallback(ConfigFactory.load())
 
     val system = ActorSystem("ClusterSystem", config)
 
     system.actorOf(Props[RunningActor], name = "statsWorker")
     system.actorOf(Props[PartitioningActor], name = "statsService")
-  }
-}
 
-object ClusterCalculationClient {
-  def main(args: Array[String]): Unit = {
-    // note that client is not a compute node, role not defined
-    val system = ActorSystem("ClusterSystem")
+  }
+
+  def client(numOfSimulations: Int) {
+    val config =
+      ConfigFactory.empty
+        .withFallback(ConfigFactory.parseString(s"atmos.trace.node = client"))
+        .withFallback(ConfigFactory.load())
+
+    val system = ActorSystem("ClusterSystem", config)
     system.actorOf(Props(classOf[ClusterCalculationClient], "/user/statsService"), "client")
+  }
+
+  def worker() {
+
+    val config =
+      ConfigFactory.empty
+        .withFallback(ConfigFactory.parseString("akka.cluster.roles = [compute]"))
+        .withFallback(ConfigFactory.parseString(s"atmos.trace.node = worker ${this.hashCode()}"))
+        .withFallback(ConfigFactory.load())
+
+    val system = ActorSystem("ClusterSystem", config)
+
+    system.actorOf(Props[RunningActor], name = "statsWorker")
+    system.actorOf(Props[PartitioningActor], name = "statsService")
   }
 }
 
@@ -138,9 +117,9 @@ class ClusterCalculationClient(servicePath: String) extends Actor {
       results.onSuccess {
         case responce: SimulationStatistics => {
           println(responce.reducedDistribution.mkString("\n"))
-          println("hitting ratio:"+responce.hittingRatio)
-          println("simulation loss:"+responce.simulationLoss)
-          println("simulation loss reduced:"+responce.simulationLossReduced)
+          println("hitting ratio:" + responce.hittingRatio)
+          println("simulation loss:" + responce.simulationLoss)
+          println("simulation loss reduced:" + responce.simulationLossReduced)
           println("analytical loss: " + risks.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
         }
       }
@@ -152,7 +131,6 @@ class ClusterCalculationClient(servicePath: String) extends Actor {
     case other: MemberEvent ⇒ nodes -= other.member.address
     case UnreachableMember(m) ⇒ nodes -= m.address
   }
-
 
 
 }
