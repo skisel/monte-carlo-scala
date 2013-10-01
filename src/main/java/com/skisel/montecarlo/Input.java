@@ -1,5 +1,7 @@
 package com.skisel.montecarlo;
 
+import com.skisel.montecarlo.entity.Risk;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 

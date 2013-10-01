@@ -1,10 +1,13 @@
-package com.skisel.montecarlo;
+package com.skisel.montecarlo.entity;
 
 import java.io.Serializable;
 
 public class Risk implements Serializable{
     private double pd;
     private double value;
+
+    public Risk() {
+    }
 
     public Risk(double pd, double value) {
         this.pd = pd;

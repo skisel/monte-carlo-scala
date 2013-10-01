@@ -1,5 +1,8 @@
 package com.skisel.montecarlo;
 
+import com.skisel.montecarlo.entity.Loss;
+import com.skisel.montecarlo.entity.Risk;
+
 import java.util.ArrayList;
 import java.util.List;
 

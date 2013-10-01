@@ -1,5 +1,7 @@
 package com.skisel.montecarlo;
 
+import com.skisel.montecarlo.entity.Loss;
+import com.skisel.montecarlo.entity.Risk;
 import org.apache.commons.math.MathException;
 import org.apache.commons.math.distribution.NormalDistributionImpl;
 import org.apache.commons.math.random.MersenneTwister;
@@ -47,6 +49,7 @@ public class Simulation {
                 if (v <= defaultThresholds[i]) {
                     Loss loss = new Loss();
                     loss.setAmount(risk.getValue());
+                    loss.setRisk(risk);
                     losses.add(loss);
                 }
                 i++;

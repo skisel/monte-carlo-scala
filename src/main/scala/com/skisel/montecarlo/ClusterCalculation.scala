@@ -7,9 +7,9 @@ import com.typesafe.config.ConfigFactory
 import akka.actor._
 import akka.util.Timeout
 import scala.collection.JavaConverters._
-import com.skisel.montecarlo.SimulationProtocol.SimulationStatistics
-import com.skisel.montecarlo.SimulationProtocol.SimulateDealPortfolio
+import com.skisel.montecarlo.SimulationProtocol.{LoadRequest, Request, SimulationStatistics, SimulateDealPortfolio}
 import akka.pattern.ask
+import com.skisel.montecarlo.entity.Risk
 
 
 //#imports
@@ -21,7 +21,11 @@ import akka.pattern.ask
 
 object Client {
   def main(args: Array[String]): Unit = {
-    Launcher.callRun(20000)
+    val inp = new Input()
+    val numOfSimulations: Int = 2000
+    println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
+    //Launcher.callRun(numOfSimulations, SimulateDealPortfolio(numOfSimulations, inp))
+    Launcher.callRun(numOfSimulations, LoadRequest(numOfSimulations))
   }
 }
 
@@ -53,17 +57,17 @@ object Launcher {
   }
 
   def client(numOfSimulations: Int) {
-    callRun(numOfSimulations)
+    //callRun(numOfSimulations)
   }
 
 
-  def callRun(numOfSimulations: Int) {
+  def callRun(numOfSimulations: Int, req: Request) {
     val config =
       ConfigFactory.empty
         .withFallback(ConfigFactory.parseString(s"atmos.trace.node = client"))
         .withFallback(ConfigFactory.load())
     val system = ActorSystem("ClusterSystem", config)
-    val client: ActorRef = system.actorOf(Props(classOf[CalculationClient], numOfSimulations))
+    system.actorOf(Props(classOf[CalculationClient], numOfSimulations, req))
   }
 
   def worker() {
@@ -80,23 +84,20 @@ object Launcher {
   }
 }
 
-class CalculationClient(numOfSimulations: Int) extends Actor {
+class CalculationClient(numOfSimulations: Int, req: Request) extends Actor {
   val clusterClient = context.actorOf(Props(classOf[ClusterAwareClient], "/user/statsService"), "client")
+
   override def preStart(): Unit = {
     import context.dispatcher
-    val inp = new Input()
-    val risks: List[Risk] = inp.getRisks.asScala.toList
     implicit val timeout = Timeout(3660000)
-    //val numOfSimulations: Int = 20000
-    val results = clusterClient ask SimulateDealPortfolio(numOfSimulations, inp)
-    //val results = runner ask LoadRequest(numOfSimulations)
+    val results = clusterClient ask req
     results.onSuccess {
       case responce: SimulationStatistics => {
         println(responce.reducedDistribution.mkString("\n"))
         println("hitting ratio:" + responce.hittingRatio)
         println("simulation loss:" + responce.simulationLoss)
         println("simulation loss reduced:" + responce.simulationLossReduced)
-        println("analytical loss: " + risks.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
+        //println("analytical loss: " + risks.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
         context.system.shutdown()
         context.system.awaitTermination()
       }

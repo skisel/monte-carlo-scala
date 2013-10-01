@@ -5,6 +5,10 @@ import java.io.{FileOutputStream, ObjectOutputStream, ObjectInputStream, FileInp
 import scala.collection.JavaConverters._
 import java.util.zip.{GZIPInputStream, GZIPOutputStream}
 import com.skisel.montecarlo.SimulationProtocol._
+import com.orientechnologies.orient.`object`.db.{OObjectDatabaseTx, ODatabaseObjectTx}
+import com.skisel.montecarlo.entity.{Event, Loss}
+import com.orientechnologies.orient.`object`.iterator.OObjectIteratorClass
+import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery
 
 class RunningActor extends Actor {
 
@@ -16,12 +20,12 @@ class RunningActor extends Actor {
   }
 
   def applyStructure(losses: List[Loss]): Double = {
-    losses.foldRight(0.0)(_.getAmount+_)
+    losses.foldRight(0.0)(_.getAmount + _)
   }
 
   def aggregateStructure(outs: => List[(Int, List[Loss])]): List[(Int, Double)] = {
     outs map {
-      x => (x._1,applyStructure(x._2))
+      x => (x._1, applyStructure(x._2))
     }
   }
 
@@ -29,8 +33,8 @@ class RunningActor extends Actor {
     case portfolioRequest: SimulatePortfolioRequest => {
       System.out.println("from:" + portfolioRequest.from + " to:" + portfolioRequest.to + " req:" + portfolioRequest.req.getClass.getSimpleName)
       val sim = new MonteCarloSimulator(portfolioRequest.req.inp)
-      val outs: List[(Int, List[Loss])] = simulation(portfolioRequest,sim)
-      //store(outs)
+      val outs: List[(Int, List[Loss])] = simulation(portfolioRequest, sim)
+      store(outs)
       sender ! AggregationResults(aggregateStructure(outs), portfolioRequest)
 
     }
@@ -44,22 +48,42 @@ class RunningActor extends Actor {
 
 
   def load(from: Int): List[(Int, List[Loss])] = {
-    val stream: ObjectInputStream = new ObjectInputStream(new GZIPInputStream(new FileInputStream("./data/mc" + from + ".bin.gz")))
-    val eventIdToLosses: List[(Int, List[Loss])] = stream.readObject().asInstanceOf[List[(Int, List[Loss])]]
-    stream.close()
-    eventIdToLosses
+    val key = from
+    val db: OObjectDatabaseTx = new OObjectDatabaseTx("remote:localhost/mc").open("admin", "admin")
+    try {
+      db.getEntityManager.registerEntityClasses("com.skisel.montecarlo.entity")
+      val result: java.util.List[Event] = db.query(new OSQLSynchQuery[Event]("select * from Event where key = '" + key + "'"));
+      val a = result.asScala.toList
+      a map {
+        x:Event => {
+          val d:Event= db.detachAll(x, true)
+          (d.getEventId.toInt, d.getLosses.asScala.toList)
+        }
+      }
+    }
+    finally {
+      db.close()
+    }
   }
 
   def store(outs: List[(Int, List[Loss])]) {
-    val stream: ObjectOutputStream = new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream("./data/mc" + outs.head._1 + ".bin.gz", false)))
-    stream.writeObject(outs)
-    stream.flush()
-    stream.close()
+    val key = outs.head._1
+    val db: OObjectDatabaseTx = new OObjectDatabaseTx("remote:localhost/mc").open("admin", "admin")
+    try {
+      db.getEntityManager.registerEntityClasses("com.skisel.montecarlo.entity")
+      for (o <- outs) {
+        if (o._2.nonEmpty)
+          db.save(new Event(o._1, key, o._2.asJava))
+      }
+    }
+    finally {
+      db.close()
+    }
   }
 
   def simulation(portfolioRequest: SimulationProtocol.SimulatePortfolioRequest, sim: MonteCarloSimulator): List[(Int, List[Loss])] = {
     ((portfolioRequest.from to portfolioRequest.to) map {
-      x => (x,simulation(portfolioRequest.req, sim))
+      x => (x, simulation(portfolioRequest.req, sim))
     }).toList
   }
 }
