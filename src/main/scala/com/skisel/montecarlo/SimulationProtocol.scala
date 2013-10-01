@@ -28,7 +28,7 @@ object SimulationProtocol {
   
   case class LoadPortfolioRequest(requestor: ActorRef, from: Int, req: LoadRequest) extends PortfolioRequest
 
-  case class AggregationResults(eventIdToAmount: List[(Int, Double)], req: PortfolioRequest)
+  case class AggregationResults(eventId:Int, amount: Double, req: PortfolioRequest)
 
   case class SimulationStatistics(simulationLoss: Double, simulationLossReduced: Double, hittingRatio: Double, reducedDistribution: List[Double])
 }

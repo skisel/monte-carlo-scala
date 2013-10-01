@@ -32,10 +32,8 @@ class PartitioningActor extends Actor {
       }
     }
 
-    case AggregationResults(eventIdToAmount, request: PortfolioRequest) => {
-      for (tuple: (Int, Double) <- eventIdToAmount) {
-        outstandingRequests += tuple._1 -> tuple._2
-      }
+    case AggregationResults(eventId:Int, amount: Double, request: PortfolioRequest) => {
+      outstandingRequests += eventId -> amount
       if (outstandingRequests.size == request.req.numOfSimulations) {
         val distribution: List[Double] = outstandingRequests.toList.map(_._2).sorted
         val simulationLoss: Double = distribution.foldRight(0.0)(_ + _) / request.req.numOfSimulations

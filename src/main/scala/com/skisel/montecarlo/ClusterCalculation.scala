@@ -24,8 +24,8 @@ object Client {
     val inp = new Input()
     val numOfSimulations: Int = 2000
     println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
-    //Launcher.callRun(numOfSimulations, SimulateDealPortfolio(numOfSimulations, inp))
-    Launcher.callRun(numOfSimulations, LoadRequest(numOfSimulations))
+    ///Launcher.callRun(numOfSimulations, SimulateDealPortfolio(numOfSimulations, inp))
+    //Launcher.callRun(numOfSimulations, LoadRequest(numOfSimulations))
   }
 }
 
@@ -36,8 +36,19 @@ object Launcher {
       case "seed" :: Nil => println("please define port number")
       case "seed" :: tail => seed(tail.head)
       case "worker" :: Nil => worker()
-      case "client" :: Nil => println("please define num of simulations")
-      case "client" :: tail => client(tail.head.toInt)
+      case "client" :: Nil => println("please define operation")
+      case "client" :: "sim" :: Nil => println("please define number of simulations")
+      case "client":: "sim" :: tail => {
+        val inp = new Input()
+        println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
+        callRun(SimulateDealPortfolio(tail.head.toInt, inp))
+      }
+      case "client" :: "load" :: Nil => println("please define number of simulations")
+      case "client" :: "load" :: tail => {
+        val inp = new Input()
+        println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
+        callRun(LoadRequest(tail.head.toInt))
+      }
       case _ => println("error")
     }
   }
@@ -56,18 +67,13 @@ object Launcher {
 
   }
 
-  def client(numOfSimulations: Int) {
-    //callRun(numOfSimulations)
-  }
-
-
-  def callRun(numOfSimulations: Int, req: Request) {
+  def callRun(req: Request) {
     val config =
       ConfigFactory.empty
         .withFallback(ConfigFactory.parseString(s"atmos.trace.node = client"))
         .withFallback(ConfigFactory.load())
     val system = ActorSystem("ClusterSystem", config)
-    system.actorOf(Props(classOf[CalculationClient], numOfSimulations, req))
+    system.actorOf(Props(classOf[CalculationClient], req.numOfSimulations, req))
   }
 
   def worker() {
