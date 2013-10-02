@@ -34,6 +34,7 @@ class RunningActor extends Actor {
       System.out.println("from:" + portfolioRequest.from + " to:" + portfolioRequest.to + " req:" + portfolioRequest.req.getClass.getSimpleName)
       val sim = new MonteCarloSimulator(portfolioRequest.req.inp)
       val outs: List[(Int, List[Loss])] = simulation(portfolioRequest, sim)
+      storage ! portfolioRequest.from
       for(x <- outs) {
         storage ! (x._1, portfolioRequest.from, x._2)
         sender ! AggregationResults(x._1, applyStructure(x._2), portfolioRequest)
@@ -42,7 +43,7 @@ class RunningActor extends Actor {
     case loadRequest: LoadPortfolioRequest => {
       implicit val timeout = Timeout(60000)
       import context.dispatcher
-      val future: Future[(Int, List[Loss])] = (storage ask loadRequest.from).mapTo[(Int, List[Loss])]
+      val future: Future[(Int, List[Loss])] = (storage ask loadRequest).mapTo[(Int, List[Loss])]
       future map {
         x: (Int, List[Loss]) => AggregationResults(x._1, applyStructure(x._2), loadRequest)
       } pipeTo sender

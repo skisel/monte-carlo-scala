@@ -4,6 +4,7 @@ import org.scalatest._
 import akka.actor.{Props, Actor, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKit}
 import com.skisel.montecarlo.entity.{Risk, Loss}
+import com.skisel.montecarlo.SimulationProtocol.LoadPortfolioRequest
 
 class StorageActorSpec(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
 with WordSpecLike with MustMatchers with BeforeAndAfterAll {
@@ -26,10 +27,9 @@ with WordSpecLike with MustMatchers with BeforeAndAfterAll {
       loss.setRisk(risk)
       val losses:List[Loss] = List(loss)
       val list: List[(Int, List[Loss])] = List((1, losses), (2, losses))
+      storage ! 1
       storage ! (1, 1, losses)
       storage ! (2, 1, losses)
-      Thread.sleep(1000)
-      storage ! 1
       expectMsg(list)
     }
 
