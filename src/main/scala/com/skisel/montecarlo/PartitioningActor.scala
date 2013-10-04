@@ -10,10 +10,16 @@ import com.skisel.montecarlo.SimulationProtocol.AggregationResults
 import com.skisel.montecarlo.SimulationProtocol.SimulatePortfolioRequest
 import com.skisel.montecarlo.SimulationProtocol.LoadPortfolioRequest
 import com.skisel.montecarlo.SimulationProtocol.LoadRequest
+import akka.pattern.{ask, pipe}
+import akka.util.Timeout
+import scala.util.Success
+
 
 class PartitioningActor extends Actor {
 
   val actor = context.actorOf(Props[RunningActor].withRouter(FromConfig), name = "workerRouter")
+  val storage = context.actorOf(Props[StorageActor])
+
   private[this] var outstandingRequests = Map.empty[Int, Double]
 
   def partitions(numOfSimulation: Int): Iterator[IndexedSeq[Int]] = {
@@ -22,29 +28,54 @@ class PartitioningActor extends Actor {
 
   def receive = {
     case simulationRequest: SimulationRequest => {
-      for (part <- partitions(simulationRequest.numOfSimulations)) {
-        actor ! SimulatePortfolioRequest(sender, part.head, part.last, simulationRequest)
+      implicit val timeout = Timeout(5000)
+      import context.dispatcher
+      val replyTo = sender
+      storage.ask(InitializeCalculation(simulationRequest.numOfSimulations)).mapTo[String].onComplete {
+        case Success(calculationId) => {
+          for (part <- partitions(simulationRequest.numOfSimulations)) {
+            actor ! SimulatePortfolioRequest(replyTo, part.head, part.last, simulationRequest, calculationId)
+          }
+        }
+        case o: Any => println("Failed get calc key " + o)
       }
     }
     case loadRequest: LoadRequest => {
-      for (part <- partitions(loadRequest.numOfSimulations)) {
-        actor ! LoadPortfolioRequest(sender, part.head, loadRequest)
+      implicit val timeout = Timeout(5000)
+      import context.dispatcher
+      val replyTo = sender
+      storage.ask(LoadCalculation(loadRequest.calculationId)).mapTo[Int].onComplete {
+        case Success(numOfSimulations: Int) => {
+          for (part <- partitions(numOfSimulations)) {
+            actor ! LoadPortfolioRequest(replyTo, part.head, loadRequest, loadRequest.calculationId, numOfSimulations)
+          }
+        }
+        case o: Any => println("Failed get num of sim" + o)
       }
+
     }
 
-    case AggregationResults(eventId:Int, amount: Double, request: PortfolioRequest) => {
+    case AggregationResults(eventId: Int, amount: Double, request: PortfolioRequest) => {
+      val numberOfSimulations: Int = request match {
+        case SimulatePortfolioRequest(_,_,_,SimulateDealPortfolio(numOfSimulations, _),_) => numOfSimulations
+        case SimulatePortfolioRequest(_,_,_,SimulateBackgroundPortfolio(numOfSimulations, _),_) => numOfSimulations
+        case LoadPortfolioRequest(_,_,_,_,numOfSimulations) => numOfSimulations
+      }
       outstandingRequests += eventId -> amount
-      if (outstandingRequests.size == request.req.numOfSimulations) {
+      if (outstandingRequests.size == numberOfSimulations) {
         val distribution: List[Double] = outstandingRequests.toList.map(_._2).sorted
-        val simulationLoss: Double = distribution.foldRight(0.0)(_ + _) / request.req.numOfSimulations
-        val reducedDistribution: List[Double] = reduceDistribution(distribution, request.req.numOfSimulations)
+        val simulationLoss: Double = distribution.foldRight(0.0)(_ + _) / numberOfSimulations
+        val reducedDistribution: List[Double] = reduceDistribution(distribution, numberOfSimulations)
         val reducedSimulationLoss: Double = reducedDistribution.foldRight(0.0)(_ + _) / 1000
-        val hittingRatio: Double = distribution.count(_ > 0).toDouble / request.req.numOfSimulations.toDouble
-        request.requestor ! SimulationStatistics(simulationLoss, reducedSimulationLoss, hittingRatio, reducedDistribution)
+        val hittingRatio: Double = distribution.count(_ > 0).toDouble / numberOfSimulations.toDouble
+        val statistics: SimulationStatistics = SimulationStatistics(simulationLoss, reducedSimulationLoss, hittingRatio, reducedDistribution, request.calculationId)
+        request.requestor ! statistics
       }
     }
 
-    case _ => println("Something failed PartitioningActor ")
+    case o: Any => {
+      println("Something failed PartitioningActor " + o)
+    }
   }
 
 

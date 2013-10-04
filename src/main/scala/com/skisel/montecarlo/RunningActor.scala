@@ -6,7 +6,6 @@ import com.skisel.montecarlo.SimulationProtocol._
 import com.skisel.montecarlo.entity.Loss
 import akka.pattern.{ask,pipe}
 import akka.util.Timeout
-import scala.concurrent.Future
 
 class RunningActor extends Actor {
 
@@ -33,28 +32,30 @@ class RunningActor extends Actor {
     case portfolioRequest: SimulatePortfolioRequest => {
       System.out.println("from:" + portfolioRequest.from + " to:" + portfolioRequest.to + " req:" + portfolioRequest.req.getClass.getSimpleName)
       val sim = new MonteCarloSimulator(portfolioRequest.req.inp)
-      val outs: List[(Int, List[Loss])] = simulation(portfolioRequest, sim)
-      storage ! portfolioRequest.from
-      for(x <- outs) {
-        storage ! (x._1, portfolioRequest.from, x._2)
-        sender ! AggregationResults(x._1, applyStructure(x._2), portfolioRequest)
+      val events: List[Event] = simulation(portfolioRequest, sim)
+      storage ! InitializeDbCluster(portfolioRequest.from)
+      for(event <- events) {
+        storage ! SaveEvent(event,  portfolioRequest.from, portfolioRequest.calculationId)
+        sender ! AggregationResults(event.eventId, applyStructure(event.losses), portfolioRequest)
       }
     }
     case loadRequest: LoadPortfolioRequest => {
       implicit val timeout = Timeout(60000)
       import context.dispatcher
-      val future: Future[(Int, List[Loss])] = (storage ask loadRequest).mapTo[(Int, List[Loss])]
-      future map {
-        x: (Int, List[Loss]) => AggregationResults(x._1, applyStructure(x._2), loadRequest)
-      } pipeTo sender
+      val replyTo = sender
+      (storage ask loadRequest).mapTo[Event] map {
+        event: (Event) => {
+          AggregationResults(event.eventId, applyStructure(event.losses), loadRequest)
+        }
+      } pipeTo replyTo
     }
 
     case _ => println("Something failed router")
   }
 
-  def simulation(portfolioRequest: SimulationProtocol.SimulatePortfolioRequest, sim: MonteCarloSimulator): List[(Int, List[Loss])] = {
+  def simulation(portfolioRequest: SimulationProtocol.SimulatePortfolioRequest, sim: MonteCarloSimulator): List[Event] = {
     ((portfolioRequest.from to portfolioRequest.to) map {
-      x => (x, simulation(portfolioRequest.req, sim))
+      x => Event(x, simulation(portfolioRequest.req, sim))
     }).toList
   }
 }

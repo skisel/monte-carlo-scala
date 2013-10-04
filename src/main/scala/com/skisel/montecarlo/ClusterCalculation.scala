@@ -23,9 +23,10 @@ object Client {
   def main(args: Array[String]): Unit = {
     val inp = new Input()
     val numOfSimulations: Int = 2000
-    println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
+    //println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
     ///Launcher.callRun(numOfSimulations, SimulateDealPortfolio(numOfSimulations, inp))
     //Launcher.callRun(numOfSimulations, LoadRequest(numOfSimulations))
+    Launcher.seed("2551")
   }
 }
 
@@ -38,16 +39,16 @@ object Launcher {
       case "worker" :: Nil => worker()
       case "client" :: Nil => println("please define operation")
       case "client" :: "sim" :: Nil => println("please define number of simulations")
-      case "client":: "sim" :: tail => {
+      case "client" :: "sim" :: tail => {
         val inp = new Input()
         println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
         callRun(SimulateDealPortfolio(tail.head.toInt, inp))
       }
-      case "client" :: "load" :: Nil => println("please define number of simulations")
+      case "client" :: "load" :: Nil => println("please define calculation key")
       case "client" :: "load" :: tail => {
         val inp = new Input()
         println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
-        callRun(LoadRequest(tail.head.toInt))
+        callRun(LoadRequest("#"+tail.head))
       }
       case _ => println("error")
     }
@@ -73,7 +74,7 @@ object Launcher {
         .withFallback(ConfigFactory.parseString(s"atmos.trace.node = client"))
         .withFallback(ConfigFactory.load())
     val system = ActorSystem("ClusterSystem", config)
-    system.actorOf(Props(classOf[CalculationClient], req.numOfSimulations, req))
+    system.actorOf(Props(classOf[CalculationClient], req))
   }
 
   def worker() {
@@ -90,7 +91,7 @@ object Launcher {
   }
 }
 
-class CalculationClient(numOfSimulations: Int, req: Request) extends Actor {
+class CalculationClient(req: Request) extends Actor {
   val clusterClient = context.actorOf(Props(classOf[ClusterAwareClient], "/user/statsService"), "client")
 
   override def preStart(): Unit = {
@@ -100,10 +101,15 @@ class CalculationClient(numOfSimulations: Int, req: Request) extends Actor {
     results.onSuccess {
       case responce: SimulationStatistics => {
         println(responce.reducedDistribution.mkString("\n"))
+        println("calculation id: " + responce.calculationId)
         println("hitting ratio:" + responce.hittingRatio)
         println("simulation loss:" + responce.simulationLoss)
         println("simulation loss reduced:" + responce.simulationLossReduced)
         //println("analytical loss: " + risks.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
+        context.system.shutdown()
+        context.system.awaitTermination()
+      }
+      case _ => {
         context.system.shutdown()
         context.system.awaitTermination()
       }
