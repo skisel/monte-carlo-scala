@@ -26,7 +26,7 @@ object Client {
     //println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
     ///Launcher.callRun(numOfSimulations, SimulateDealPortfolio(numOfSimulations, inp))
     //Launcher.callRun(numOfSimulations, LoadRequest(numOfSimulations))
-    Launcher.seed("2551")
+    Launcher.seed("2551", "localhost")
   }
 }
 
@@ -35,7 +35,8 @@ object Launcher {
     val arguments: List[String] = args.head.trim.split(" ").toList
     arguments match {
       case "seed" :: Nil => println("please define port number")
-      case "seed" :: tail => seed(tail.head)
+      case "seed" :: port :: Nil => seed(port, "localhost")
+      case "seed" :: port :: tail => seed(port, tail.head)
       case "worker" :: Nil => worker()
       case "client" :: Nil => println("please define operation")
       case "client" :: "sim" :: Nil => println("please define number of simulations")
@@ -54,9 +55,10 @@ object Launcher {
     }
   }
 
-  def seed(port: String) {
+  def seed(port: String, host: String) {
     val config =
       ConfigFactory.parseString(s"akka.remote.netty.tcp.port=${port}")
+        .withFallback(ConfigFactory.parseString(s"akka.remote.netty.tcp.hostname=${host}"))
         .withFallback(ConfigFactory.parseString("akka.cluster.roles = [compute]"))
         .withFallback(ConfigFactory.parseString(s"atmos.trace.node = seed ${port}"))
         .withFallback(ConfigFactory.load())
