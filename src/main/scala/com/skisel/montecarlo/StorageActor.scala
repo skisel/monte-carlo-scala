@@ -17,7 +17,7 @@ import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery
 
 class StorageActor extends Actor {
 
-  val otx: ODatabaseDocumentTx = new ODatabaseDocumentTx("remote:localhost/mc")
+  val otx: ODatabaseDocumentTx = new ODatabaseDocumentTx("remote:192.168.2.109/mc")
 
   implicit def dbWrapper(db: ODatabaseDocumentTx) = new {
     def queryBySql[T](sql: String, params: AnyRef*): List[T] = {
