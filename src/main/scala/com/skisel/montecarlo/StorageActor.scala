@@ -3,7 +3,6 @@ package com.skisel.montecarlo
 import akka.actor.Actor
 import com.skisel.montecarlo.entity.Loss
 import scala.collection.JavaConverters._
-import scala.collection.JavaConversions._
 import com.skisel.montecarlo.SimulationProtocol._
 import com.orientechnologies.orient.core.storage.OStorage
 import com.orientechnologies.orient.core.metadata.schema.OClass
@@ -14,7 +13,6 @@ import com.skisel.montecarlo.SimulationProtocol.Event
 import com.skisel.montecarlo.SimulationProtocol.InitializeDbCluster
 import com.skisel.montecarlo.SimulationProtocol.SaveEvent
 import com.orientechnologies.orient.core.id.ORID
-import com.orientechnologies.orient.core.query.nativ.{OQueryContextNative, OQueryContextNativeSchema, ONativeSynchQuery}
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery
 
 class StorageActor extends Actor {
