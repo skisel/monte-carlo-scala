@@ -26,7 +26,7 @@ object Client {
     //println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
     ///Launcher.callRun(numOfSimulations, SimulateDealPortfolio(numOfSimulations, inp))
     //Launcher.callRun(numOfSimulations, LoadRequest(numOfSimulations))
-    Launcher.seed("2551", "localhost")
+    Launcher.seed("2551", "192.168.2.109")
   }
 }
 
@@ -58,7 +58,7 @@ object Launcher {
   def seed(port: String, host: String) {
     val config =
       ConfigFactory.parseString(s"akka.remote.netty.tcp.port=${port}")
-        .withFallback(ConfigFactory.parseString(s"akka.remote.netty.tcp.hostname=${host}"))
+        .withFallback(ConfigFactory.parseString("akka.remote.netty.tcp.hostname=\""+host+"\""))
         .withFallback(ConfigFactory.parseString("akka.cluster.roles = [compute]"))
         .withFallback(ConfigFactory.parseString(s"atmos.trace.node = seed ${port}"))
         .withFallback(ConfigFactory.load())
