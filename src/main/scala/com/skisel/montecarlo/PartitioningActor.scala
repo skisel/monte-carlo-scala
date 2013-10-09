@@ -17,7 +17,7 @@ import scala.util.Success
 
 class PartitioningActor extends Actor {
 
-  val actor = context.actorOf(Props[RunningActor].withRouter(FromConfig), name = "workerRouter")
+  val actor = context.actorOf(Props[RunningActor].withRouter(FromConfig), name = "runningActorRouter")
   val storage = context.actorOf(Props[StorageActor])
 
   private[this] var outstandingRequests = Map.empty[Int, Double]

@@ -58,15 +58,14 @@ object Launcher {
   def seed(port: String, host: String) {
     val config =
       ConfigFactory.parseString(s"akka.remote.netty.tcp.port=${port}")
-        .withFallback(ConfigFactory.parseString("akka.remote.netty.tcp.hostname=\""+host+"\""))
         .withFallback(ConfigFactory.parseString("akka.cluster.roles = [compute]"))
         .withFallback(ConfigFactory.parseString(s"atmos.trace.node = seed ${port}"))
         .withFallback(ConfigFactory.load())
 
     val system = ActorSystem("ClusterSystem", config)
 
-    system.actorOf(Props[RunningActor], name = "statsWorker")
-    system.actorOf(Props[PartitioningActor], name = "statsService")
+    system.actorOf(Props[RunningActor], name = "runningActor")
+    system.actorOf(Props[PartitioningActor], name = "partitioningActor")
 
   }
 
@@ -88,13 +87,13 @@ object Launcher {
 
     val system = ActorSystem("ClusterSystem", config)
 
-    system.actorOf(Props[RunningActor], name = "statsWorker")
-    system.actorOf(Props[PartitioningActor], name = "statsService")
+    system.actorOf(Props[RunningActor], name = "runningActor")
+    system.actorOf(Props[PartitioningActor], name = "partitioningActor")
   }
 }
 
 class CalculationClient(req: Request) extends Actor {
-  val clusterClient = context.actorOf(Props(classOf[ClusterAwareClient], "/user/statsService"), "client")
+  val clusterClient = context.actorOf(Props(classOf[ClusterAwareClient], "/user/partitioningActor"), "client")
 
   override def preStart(): Unit = {
     import context.dispatcher
