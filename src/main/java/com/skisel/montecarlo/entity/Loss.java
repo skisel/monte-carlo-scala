@@ -41,19 +41,5 @@ public class Loss implements Serializable {
         return gson.fromJson(losses, new TypeToken<List<Loss>>(){}.getType());
     }
 
-
-
-    public static void main(String[] args) {
-        Loss loss = new Loss();
-        loss.setAmount(123);
-        loss.setRisk(new Risk(0.01, 150));
-        ArrayList<Loss> losses = new ArrayList<Loss>();
-        losses.add(loss);
-        losses.add(loss);
-        String s = new String(Loss.toJson(losses));
-        System.out.println(s);
-        String json = "[{\"amount\":123.0,\"risk\":{\"pd\":0.01,\"value\":150.0}},{\"amount\":123.0,\"risk\":{\"pd\":0.01,\"value\":150.0}}]\n";
-        List<Loss> s1 = Loss.fromJson(json);
-    }
 }
 

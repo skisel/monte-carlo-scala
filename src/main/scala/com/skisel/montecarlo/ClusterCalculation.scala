@@ -1,7 +1,5 @@
 package com.skisel.montecarlo
 
-//#imports
-
 import language.postfixOps
 import com.typesafe.config.ConfigFactory
 import akka.actor._
@@ -11,24 +9,10 @@ import com.skisel.montecarlo.SimulationProtocol.{LoadRequest, Request, Simulatio
 import akka.pattern.ask
 import com.skisel.montecarlo.entity.Risk
 
-
-//#imports
-
 //seed 2551
 //seed 2552
 //worker
 //client
-
-object Client {
-  def main(args: Array[String]): Unit = {
-    val inp = new Input()
-    val numOfSimulations: Int = 2000
-    //println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
-    ///Launcher.callRun(numOfSimulations, SimulateDealPortfolio(numOfSimulations, inp))
-    //Launcher.callRun(numOfSimulations, LoadRequest(numOfSimulations))
-    Launcher.seed("2551", "localhost")
-  }
-}
 
 object Launcher {
   def main(args: Array[String]): Unit = {
