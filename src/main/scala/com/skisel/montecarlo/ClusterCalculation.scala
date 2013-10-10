@@ -95,6 +95,7 @@ class CalculationClient(req: Request) extends Actor {
         context.system.awaitTermination()
       }
       case _ => {
+        println("somethng failed")
         context.system.shutdown()
         context.system.awaitTermination()
       }

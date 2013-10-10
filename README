@@ -5,3 +5,4 @@ TODO:
 3) TypedActors for interface
 4) Failure handling
 5) Migrate to sbt
+6) testing (including multi-jvm)
