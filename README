@@ -1,1 +1,6 @@
-This file was created by IntelliJ IDEA 12.1.4 for binding GitHub repository
+TODO:
+
+1) Add play as interface
+2) Play frontend should be cluster client: http://doc.akka.io/docs/akka/2.2.0/contrib/cluster-client.html
+3) TypedActors for interface
+4) Failure handling
