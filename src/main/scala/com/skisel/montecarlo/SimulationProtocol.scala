@@ -20,8 +20,6 @@ object SimulationProtocol {
   case class SimulateBackgroundPortfolio(numOfSimulations: Int, inp: Input) extends SimulationRequest
 
   abstract class PortfolioRequest() {
-    def requestor: ActorRef
-
     def from: Int
 
     def req: Request
@@ -29,9 +27,9 @@ object SimulationProtocol {
     def calculationId: String
   }
 
-  case class SimulatePortfolioRequest(requestor: ActorRef, from: Int, to: Int, req: SimulationRequest, calculationId: String) extends PortfolioRequest
+  case class SimulatePortfolioRequest(from: Int, to: Int, req: SimulationRequest, calculationId: String) extends PortfolioRequest
 
-  case class LoadPortfolioRequest(requestor: ActorRef, from: Int, req: LoadRequest, calculationId: String, numOfSimulations: Int) extends PortfolioRequest
+  case class LoadPortfolioRequest(from: Int, req: LoadRequest, calculationId: String, numOfSimulations: Int) extends PortfolioRequest
 
   case class AggregationResults(eventId: Int, amount: Double, req: PortfolioRequest)
 

@@ -15,7 +15,7 @@ import com.skisel.montecarlo.SimulationProtocol.SaveEvent
 import com.orientechnologies.orient.core.id.ORID
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery
 
-class StorageActor extends Actor {
+class StorageActor extends Actor with akka.actor.ActorLogging {
 
   val otx: ODatabaseDocumentTx = new ODatabaseDocumentTx("remote:localhost/mc")
 
@@ -29,7 +29,7 @@ class StorageActor extends Actor {
 
   def receive = {
     case InitializeDbCluster(key: Int) => {
-      println("create cluster " + key)
+      log.info("InitializeDbCluster " + key)
       val db: ODatabaseDocumentTx = otx.open("admin", "admin")
       try {
         val clusterName: String = "a" + key
@@ -45,6 +45,7 @@ class StorageActor extends Actor {
       }
     }
     case InitializeCalculation(numOfSimulations: Int) => {
+      log.info("InitializeCalculation " + numOfSimulations)
       val db: ODatabaseDocumentTx = otx.open("admin", "admin")
       try {
         val doc: ODocument = db.newInstance()
@@ -60,6 +61,7 @@ class StorageActor extends Actor {
     }
 
     case LoadCalculation(calculationId: String) => {
+      log.info("LoadCalculation " + calculationId)
       val db: ODatabaseDocumentTx = otx.open("admin", "admin")
       try {
         val list: List[ODocument] = db.queryBySql("select from Calculation where @rid=?", calculationId)
@@ -72,6 +74,7 @@ class StorageActor extends Actor {
     }
 
     case SaveEvent(event: Event, key: Int, calculationId: String) => {
+      log.debug("SaveEvent " + event)
       val db: ODatabaseDocumentTx = otx.open("admin", "admin")
       try {
         val doc: ODocument = db.newInstance()
@@ -85,21 +88,24 @@ class StorageActor extends Actor {
         db.close()
       }
     }
-    case LoadPortfolioRequest(_, key: Int, _, calculationKey: String, _) => {
+    case LoadPortfolioRequest(key: Int, _, calculationKey: String, _) => {
+      log.info("LoadPortfolioRequest key:" + key + " calculationKey" + calculationKey)
       val db: ODatabaseDocumentTx = otx.open("admin", "admin")
       try {
-        val result: List[ODocument] = db.queryBySql("select from cluster:a"+key+" where calculationId=?", calculationKey)
-        for (x: ODocument <- result) {
-          val eventId: Integer = x.field("eventId")
-          val losses: java.util.List[Loss] = Loss.fromJson(x.field("losses"))
-          sender ! Event(eventId.toInt, losses.asScala.toList)
-        }
+        val result: List[ODocument] = db.queryBySql("select from cluster:a" + key + " where calculationId=?", calculationKey)
+        sender ! (result map {
+          x: ODocument => {
+            val eventId: Integer = x.field("eventId")
+            val losses: java.util.List[Loss] = Loss.fromJson(x.field("losses"))
+            Event(eventId.toInt, losses.asScala.toList)
+          }
+        }).toList
       }
       finally {
         db.close()
       }
     }
-    case _ => println("StorageActor error")
+    case x: Any => log.error("Unexpected message has been received: " + x)
   }
 
   def getCalculationId(identity: ORID): String = {

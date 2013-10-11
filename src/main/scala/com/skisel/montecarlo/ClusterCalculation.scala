@@ -8,6 +8,7 @@ import scala.collection.JavaConverters._
 import com.skisel.montecarlo.SimulationProtocol.{LoadRequest, Request, SimulationStatistics, SimulateDealPortfolio}
 import akka.pattern.ask
 import com.skisel.montecarlo.entity.Risk
+import scala.util.{Failure, Success}
 
 //seed 2551
 //seed 2552
@@ -33,7 +34,7 @@ object Launcher {
       case "client" :: "load" :: tail => {
         val inp = new Input()
         println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
-        callRun(LoadRequest("#"+tail.head))
+        callRun(LoadRequest("#" + tail.head))
       }
       case _ => println("error")
     }
@@ -76,34 +77,34 @@ object Launcher {
   }
 }
 
-class CalculationClient(req: Request) extends Actor {
+class CalculationClient(req: Request) extends Actor with akka.actor.ActorLogging {
   val clusterClient = context.actorOf(Props(classOf[ClusterAwareClient], "/user/partitioningActor"), "client")
 
   override def preStart(): Unit = {
     import context.dispatcher
     implicit val timeout = Timeout(3660000)
     val results = clusterClient ask req
-    results.onSuccess {
-      case responce: SimulationStatistics => {
+    results.onComplete {
+      case Success(responce: SimulationStatistics) => {
         println(responce.reducedDistribution.mkString("\n"))
         println("calculation id: " + responce.calculationId)
         println("hitting ratio:" + responce.hittingRatio)
         println("simulation loss:" + responce.simulationLoss)
         println("simulation loss reduced:" + responce.simulationLossReduced)
-        //println("analytical loss: " + risks.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
         context.system.shutdown()
         context.system.awaitTermination()
       }
-      case _ => {
-        println("somethng failed")
+      case Success(x: Any) => log.error("Unexpected message has been received: " + x)
+      case Failure(e: Throwable) => {
         context.system.shutdown()
         context.system.awaitTermination()
+        log.error("Failed to get an answer", e)
       }
     }
   }
 
   def receive = {
-    case _ => println("errorzz")
+    case x: Any => log.error("Unexpected message has been received: " + x)
   }
 }
 

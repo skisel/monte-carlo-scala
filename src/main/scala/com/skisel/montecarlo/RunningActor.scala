@@ -4,10 +4,12 @@ import akka.actor.{Props, Actor}
 import scala.collection.JavaConverters._
 import com.skisel.montecarlo.SimulationProtocol._
 import com.skisel.montecarlo.entity.Loss
-import akka.pattern.{ask,pipe}
+import akka.pattern.{ask, pipe}
 import akka.util.Timeout
+import scala.concurrent.{Await, Future}
+import scala.util.Success
 
-class RunningActor extends Actor {
+class RunningActor extends Actor with akka.actor.ActorLogging {
 
   val storage = context.actorOf(Props[StorageActor])
 
@@ -30,27 +32,22 @@ class RunningActor extends Actor {
 
   def receive = {
     case portfolioRequest: SimulatePortfolioRequest => {
-      System.out.println("from:" + portfolioRequest.from + " to:" + portfolioRequest.to + " req:" + portfolioRequest.req.getClass.getSimpleName)
       val sim = new MonteCarloSimulator(portfolioRequest.req.inp)
       val events: List[Event] = simulation(portfolioRequest, sim)
       storage ! InitializeDbCluster(portfolioRequest.from)
-      for(event <- events) {
-        storage ! SaveEvent(event,  portfolioRequest.from, portfolioRequest.calculationId)
+      for (event <- events) {
+        storage ! SaveEvent(event, portfolioRequest.from, portfolioRequest.calculationId)
         sender ! AggregationResults(event.eventId, applyStructure(event.losses), portfolioRequest)
       }
     }
     case loadRequest: LoadPortfolioRequest => {
       implicit val timeout = Timeout(60000)
-      import context.dispatcher
-      val replyTo = sender
-      (storage ask loadRequest).mapTo[Event] map {
-        event: (Event) => {
-          AggregationResults(event.eventId, applyStructure(event.losses), loadRequest)
-        }
-      } pipeTo replyTo
+      val events: List[Event] = Await.result(storage ask loadRequest,timeout.duration).asInstanceOf[List[Event]]
+      for (event <- events) {
+        sender ! AggregationResults(event.eventId, applyStructure(event.losses), loadRequest)
+      }
     }
-
-    case _ => println("Something failed router")
+    case x: Any => log.error("Unexpected message has been received: " + x)
   }
 
   def simulation(portfolioRequest: SimulationProtocol.SimulatePortfolioRequest, sim: MonteCarloSimulator): List[Event] = {
