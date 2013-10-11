@@ -29,6 +29,7 @@ class MonteCarloResultAggregator(requestor: ActorRef) extends Actor with akka.ac
         val hittingRatio: Double = distribution.count(_ > 0).toDouble / numberOfSimulations.toDouble
         val statistics: SimulationStatistics = SimulationStatistics(simulationLoss, reducedSimulationLoss, hittingRatio, reducedDistribution, request.calculationId)
         requestor ! statistics
+        context.stop(self)
       }
     }
     case x: Any => log.error("Unexpected message has been received: " + x)
