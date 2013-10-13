@@ -17,26 +17,29 @@ import scala.util.{Failure, Success}
 
 object Launcher {
   def main(args: Array[String]): Unit = {
-    val arguments: List[String] = args.head.trim.split(" ").toList
-    arguments match {
-      case "seed" :: Nil => println("please define port number")
-      case "seed" :: port :: Nil => seed(port, "localhost")
-      case "seed" :: port :: tail => seed(port, tail.head)
-      case "worker" :: Nil => worker()
-      case "client" :: Nil => println("please define operation")
-      case "client" :: "sim" :: Nil => println("please define number of simulations")
-      case "client" :: "sim" :: tail => {
-        val inp = new Input()
-        println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
-        callRun(SimulateDealPortfolio(tail.head.toInt, inp))
+    if (args == null || args.length == 0) seed("2551", "localhost")
+    else {
+      val arguments: List[String] = args.head.trim.split(" ").toList
+      arguments match {
+        case "seed" :: Nil => println("please define port number")
+        case "seed" :: port :: Nil => seed(port, "localhost")
+        case "seed" :: port :: tail => seed(port, tail.head)
+        case "worker" :: Nil => worker()
+        case "client" :: Nil => println("please define operation")
+        case "client" :: "sim" :: Nil => println("please define number of simulations")
+        case "client" :: "sim" :: tail => {
+          val inp = new Input()
+          println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
+          callRun(SimulateDealPortfolio(tail.head.toInt, inp))
+        }
+        case "client" :: "load" :: Nil => println("please define calculation key")
+        case "client" :: "load" :: tail => {
+          val inp = new Input()
+          println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
+          callRun(LoadRequest("#" + tail.head))
+        }
+        case _ => println("error")
       }
-      case "client" :: "load" :: Nil => println("please define calculation key")
-      case "client" :: "load" :: tail => {
-        val inp = new Input()
-        println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
-        callRun(LoadRequest("#" + tail.head))
-      }
-      case _ => println("error")
     }
   }
 
