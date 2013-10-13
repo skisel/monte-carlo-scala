@@ -82,14 +82,6 @@
             <version>2.2.1</version>
         </dependency>
 
-        <!--
-                <dependency>
-                    <groupId>aspectj</groupId>
-                    <artifactId>aspectjweaver</artifactId>
-                    <version>1.5.4</version>
-                </dependency>
-        -->
-
         <dependency>
             <groupId>com.typesafe.atmos</groupId>
             <artifactId>trace-akka-2.2.1_2.10</artifactId>
@@ -107,12 +99,6 @@
             <artifactId>scala-library</artifactId>
             <version>${scala.version}</version>
         </dependency>
-
-        <!--<dependency>
-            <groupId>com.github.scala-incubator.io</groupId>
-            <artifactId>scala-io-file_2.10</artifactId>
-            <version>0.4.2</version>
-        </dependency>-->
 
         <dependency>
             <groupId>com.orientechnologies</groupId>

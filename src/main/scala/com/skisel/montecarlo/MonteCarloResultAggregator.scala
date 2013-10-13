@@ -2,12 +2,6 @@ package com.skisel.montecarlo
 
 import akka.actor.{ActorRef, Actor}
 import com.skisel.montecarlo.SimulationProtocol._
-import com.skisel.montecarlo.SimulationProtocol.LoadPortfolioRequest
-import com.skisel.montecarlo.SimulationProtocol.SimulateDealPortfolio
-import com.skisel.montecarlo.SimulationProtocol.SimulateBackgroundPortfolio
-import com.skisel.montecarlo.SimulationProtocol.AggregationResults
-import com.skisel.montecarlo.SimulationProtocol.SimulationStatistics
-import com.skisel.montecarlo.SimulationProtocol.SimulatePortfolioRequest
 
 class MonteCarloResultAggregator(requestor: ActorRef) extends Actor with akka.actor.ActorLogging {
 
