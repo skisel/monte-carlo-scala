@@ -3,17 +3,12 @@ package com.skisel.montecarlo
 import akka.actor.{ActorRef, Actor}
 import com.skisel.montecarlo.SimulationProtocol._
 
-class MonteCarloResultAggregator(requestor: ActorRef) extends Actor with akka.actor.ActorLogging {
+class MonteCarloResultAggregator(requestor: ActorRef, numberOfSimulations: Int) extends Actor with akka.actor.ActorLogging {
 
   private[this] var outstandingRequests = Map.empty[Int, Double]
 
   def receive = {
     case AggregationResults(eventId: Int, amount: Double, request: PortfolioRequest) => {
-      val numberOfSimulations: Int = request match {
-        case SimulatePortfolioRequest(_, _, SimulateDealPortfolio(numOfSimulations, _), _) => numOfSimulations
-        case SimulatePortfolioRequest(_, _, SimulateBackgroundPortfolio(numOfSimulations, _), _) => numOfSimulations
-        case LoadPortfolioRequest( _, _, _, numOfSimulations) => numOfSimulations
-      }
       outstandingRequests += eventId -> amount
       if (outstandingRequests.size == numberOfSimulations) {
         val distribution: List[Double] = outstandingRequests.toList.map(_._2).sorted

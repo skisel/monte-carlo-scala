@@ -5,11 +5,7 @@ import language.postfixOps
 import akka.actor.{ActorRef, Actor, Props}
 import akka.routing.FromConfig
 import com.skisel.montecarlo.SimulationProtocol._
-import com.skisel.montecarlo.SimulationProtocol.AggregationResults
-import com.skisel.montecarlo.SimulationProtocol.SimulatePortfolioRequest
-import com.skisel.montecarlo.SimulationProtocol.LoadPortfolioRequest
-import com.skisel.montecarlo.SimulationProtocol.LoadRequest
-import akka.pattern.{ask, pipe}
+import akka.pattern.ask
 import akka.util.Timeout
 import scala.util.Success
 
@@ -27,7 +23,7 @@ class PartitioningActor extends Actor with akka.actor.ActorLogging {
     case simulationRequest: SimulationRequest => {
       implicit val timeout = Timeout(5000)
       import context.dispatcher
-      val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], sender))
+      val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], sender, simulationRequest.numOfSimulations))
       storage.ask(InitializeCalculation(simulationRequest.numOfSimulations)).mapTo[String].onComplete {
         case Success(calculationId) => {
           for (part <- partitions(simulationRequest.numOfSimulations)) {
@@ -40,9 +36,9 @@ class PartitioningActor extends Actor with akka.actor.ActorLogging {
     case loadRequest: LoadRequest => {
       implicit val timeout = Timeout(5000)
       import context.dispatcher
-      val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], sender))
       storage.ask(LoadCalculation(loadRequest.calculationId)).mapTo[Int].onComplete {
         case Success(numOfSimulations: Int) => {
+          val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], sender, numOfSimulations))
           for (part <- partitions(numOfSimulations)) {
             actor.tell(LoadPortfolioRequest(part.head, loadRequest, loadRequest.calculationId, numOfSimulations),aggregator)
           }
