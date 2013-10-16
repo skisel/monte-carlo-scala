@@ -19,6 +19,7 @@ class CalculationClient(req: Request) extends Actor with akka.actor.ActorLogging
 
   override def preStart(): Unit = {
     implicit val timeout = Timeout(3660000)
+    import context.dispatcher
     val results = clusterClient ask req
     results.onComplete {
       case Success(responce: SimulationStatistics) => {
