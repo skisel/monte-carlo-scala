@@ -39,6 +39,7 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
         }
         val clazz: OClass = otx.getMetadata.getSchema.getClass("Event")
         if (!clazz.getClusterIds.contains(id)) clazz.addClusterId(id)
+        sender ! key
       }
       finally {
         db.close()
