@@ -21,7 +21,7 @@ class PartitioningActor extends Actor with akka.actor.ActorLogging {
 
   def receive = {
     case simulationRequest: SimulationRequest => {
-      implicit val timeout = Timeout(5000)
+      implicit val timeout = Timeout(30000)
       import context.dispatcher
       val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], sender, simulationRequest.numOfSimulations))
       storage.ask(InitializeCalculation(simulationRequest.numOfSimulations)).mapTo[String].onComplete {
@@ -34,7 +34,7 @@ class PartitioningActor extends Actor with akka.actor.ActorLogging {
       }
     }
     case loadRequest: LoadRequest => {
-      implicit val timeout = Timeout(5000)
+      implicit val timeout = Timeout(30000)
       import context.dispatcher
       storage.ask(LoadCalculation(loadRequest.calculationId)).mapTo[Int].onComplete {
         case Success(numOfSimulations: Int) => {
