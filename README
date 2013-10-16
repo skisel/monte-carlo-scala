@@ -4,5 +4,6 @@ TODO:
 2) Play frontend should be cluster client: http://doc.akka.io/docs/akka/2.2.0/contrib/cluster-client.html
 3) TypedActors for interface
 4) Failure handling
-5) Migrate to sbt
-6) testing (including multi-jvm)
+5) testing (including multi-jvm)
+6) clustered configuration
+7) automatic deployment
