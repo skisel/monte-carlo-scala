@@ -24,12 +24,6 @@ class RunningActor extends Actor with akka.actor.ActorLogging {
     losses.foldRight(0.0)(_.getAmount + _)
   }
 
-  def aggregateStructure(outs: => List[(Int, List[Loss])]): List[(Int, Double)] = {
-    outs map {
-      x => (x._1, applyStructure(x._2))
-    }
-  }
-
   def receive = {
     case portfolioRequest: SimulatePortfolioRequest => {
       val sim = new MonteCarloSimulator(portfolioRequest.req.inp)
