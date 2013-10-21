@@ -71,6 +71,7 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
 
     case SaveEvents(events: List[Event], key: Int, calculationId: String) => {
       doInTransaction((db: ODatabaseDocumentTx) => {
+        db.declareIntent(new OIntentMassiveInsert)
         for (event <- events) {
           val doc: ODocument = db.newInstance()
           doc.field("@class", "Event")
