@@ -16,8 +16,8 @@ class PartitioningActor extends Actor with akka.actor.ActorLogging {
   val actor = context.actorOf(Props[RunningActor].withRouter(FromConfig), name = "runningActorRouter")
   val storage = context.actorOf(Props[StorageActor])
 
-  def partitions(numOfSimulation: Int): Iterator[IndexedSeq[Int]] = {
-    (1 to numOfSimulation).grouped(1000)
+  def partitions(numOfSimulation: Int): List[IndexedSeq[Int]] = {
+    (1 to numOfSimulation).grouped(1000).toList
   }
 
   def receive = {
@@ -27,13 +27,13 @@ class PartitioningActor extends Actor with akka.actor.ActorLogging {
       val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], sender, simulationRequest.numOfSimulations))
       storage.ask(InitializeCalculation(simulationRequest.numOfSimulations)).mapTo[String].onComplete {
         case Success(calculationId) => {
-          val eventPartitions: Iterator[IndexedSeq[Int]] = partitions(simulationRequest.numOfSimulations)
-          val initClustersFutures: Iterator[Future[Int]] =
+          val eventPartitions: List[IndexedSeq[Int]] = partitions(simulationRequest.numOfSimulations)
+          val initClustersFutures: List[Future[Int]] =
             for {part <- eventPartitions} yield {
               storage.ask(InitializeDbCluster(part.head)).mapTo[Int]
             }
           Await.result(Future.sequence(initClustersFutures),timeout.duration)
-          for (part <- partitions(simulationRequest.numOfSimulations)) {
+          for (part <- eventPartitions) {
             actor.tell(SimulatePortfolioRequest(part.head, part.last, simulationRequest, calculationId), aggregator)
           }
         }
