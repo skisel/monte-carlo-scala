@@ -29,7 +29,7 @@ object Launcher {
         println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
         clientRun(LoadRequest("#" + tail.head))
       }
-      case _ => println("error")
+      case _ => println("error, unknown command: " + (args mkString " "))
     }
   }
 

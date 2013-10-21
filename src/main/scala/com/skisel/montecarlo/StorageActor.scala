@@ -17,7 +17,8 @@ import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery
 
 class StorageActor extends Actor with akka.actor.ActorLogging {
 
-  val otx: ODatabaseDocumentTx = new ODatabaseDocumentTx("remote:localhost/mc")
+  val settings = Settings(context.system)
+  val otx: ODatabaseDocumentTx = new ODatabaseDocumentTx(settings.DbUri)
 
   implicit def dbWrapper(db: ODatabaseDocumentTx) = new {
     def queryBySql[T](sql: String, params: AnyRef*): List[T] = {
@@ -30,7 +31,7 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
   def receive = {
     case InitializeDbCluster(key: Int) => {
       log.info("InitializeDbCluster " + key)
-      val db: ODatabaseDocumentTx = otx.open("admin", "admin")
+      val db: ODatabaseDocumentTx = otx.open(settings.DbUsername, settings.DbPassword)
       try {
         val clusterName: String = "a" + key
         var id: Integer = db.getClusterIdByName(clusterName)
@@ -49,7 +50,7 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
     }
     case InitializeCalculation(numOfSimulations: Int) => {
       log.info("InitializeCalculation " + numOfSimulations)
-      val db: ODatabaseDocumentTx = otx.open("admin", "admin")
+      val db: ODatabaseDocumentTx = otx.open(settings.DbUsername, settings.DbPassword)
       try {
         val doc: ODocument = db.newInstance()
         doc.field("@class", "Calculation")
@@ -65,7 +66,7 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
 
     case LoadCalculation(calculationId: String) => {
       log.info("LoadCalculation " + calculationId)
-      val db: ODatabaseDocumentTx = otx.open("admin", "admin")
+      val db: ODatabaseDocumentTx = otx.open(settings.DbUsername, settings.DbPassword)
       try {
         val list: List[ODocument] = db.queryBySql("select from Calculation where @rid=?", calculationId)
         val field: Integer = list.head.field("numOfSimulations")
@@ -78,7 +79,7 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
 
     case SaveEvent(event: Event, key: Int, calculationId: String) => {
       log.debug("SaveEvent " + event)
-      val db: ODatabaseDocumentTx = otx.open("admin", "admin")
+      val db: ODatabaseDocumentTx = otx.open(settings.DbUsername, settings.DbPassword)
       try {
         val doc: ODocument = db.newInstance()
         doc.field("@class", "Event")
@@ -93,7 +94,7 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
     }
     case LoadPortfolioRequest(key: Int, _, calculationKey: String, _) => {
       log.info("LoadPortfolioRequest key:" + key + " calculationKey" + calculationKey)
-      val db: ODatabaseDocumentTx = otx.open("admin", "admin")
+      val db: ODatabaseDocumentTx = otx.open(settings.DbUsername, settings.DbPassword)
       try {
         val result: List[ODocument] = db.queryBySql("select from cluster:a" + key + " where calculationId=?", calculationKey)
         sender ! (result map {
