@@ -5,15 +5,17 @@ import com.typesafe.config.ConfigFactory
 import akka.actor._
 import scala.collection.JavaConverters._
 import com.skisel.montecarlo.SimulationProtocol._
+import com.orientechnologies.orient.core.config.OGlobalConfiguration
 
 object Launcher {
   def main(args: Array[String]): Unit = {
     args.toList match {
-      case Nil => seed("2551", "localhost")
+      case Nil => seed("2551")
       case "seed" :: Nil => println("please define port number")
-      case "seed" :: port :: Nil => seed(port, "localhost")
-      case "seed" :: port :: tail => seed(port, tail.head)
+      case "seed" :: port :: Nil => seed(port)
       case "worker" :: Nil => worker()
+      case "sim" :: xs:: Nil => simulation(xs.toInt)
+      case "load" :: xs :: Nil => load(xs)
       case "client" :: Nil => println("please define operation")
       case "client" :: "sim" :: Nil => println("please define number of simulations")
       case "client" :: "sim" :: tail => {
@@ -31,7 +33,7 @@ object Launcher {
     }
   }
 
-  def seed(port: String, host: String) {
+  def seed(port: String) {
     val config =
       ConfigFactory.parseString(s"akka.remote.netty.tcp.port=${port}")
         .withFallback(ConfigFactory.parseString("akka.cluster.roles = [compute]"))
@@ -42,7 +44,34 @@ object Launcher {
 
     system.actorOf(Props[RunningActor], name = "runningActor")
     system.actorOf(Props[PartitioningActor], name = "partitioningActor")
+  }
 
+  def simulation(sims: Int) {
+    val config =
+      ConfigFactory.parseString(s"akka.remote.netty.tcp.port=2551")
+        .withFallback(ConfigFactory.parseString("akka.cluster.roles = [compute]"))
+        .withFallback(ConfigFactory.parseString(s"atmos.trace.node = seed 2551"))
+        .withFallback(ConfigFactory.load())
+
+    val system = ActorSystem("ClusterSystem", config)
+
+    system.actorOf(Props[RunningActor], name = "runningActor")
+    system.actorOf(Props[PartitioningActor], name = "partitioningActor")
+    system.actorOf(Props(classOf[CalculationClient], SimulateDealPortfolio(sims, new Input())))
+  }
+
+  def load(key: String) {
+    val config =
+      ConfigFactory.parseString(s"akka.remote.netty.tcp.port=2551")
+        .withFallback(ConfigFactory.parseString("akka.cluster.roles = [compute]"))
+        .withFallback(ConfigFactory.parseString(s"atmos.trace.node = seed 2551"))
+        .withFallback(ConfigFactory.load())
+
+    val system = ActorSystem("ClusterSystem", config)
+
+    system.actorOf(Props[RunningActor], name = "runningActor")
+    system.actorOf(Props[PartitioningActor], name = "partitioningActor")
+    system.actorOf(Props(classOf[CalculationClient], LoadRequest("#" + key)))
   }
 
   def callRun(req: Request) {

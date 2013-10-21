@@ -37,9 +37,11 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
         if (id == (-1)) {
           id = db.addCluster(clusterName, OStorage.CLUSTER_TYPE.PHYSICAL, null, null)
         }
-        val clazz: OClass = otx.getMetadata.getSchema.getClass("Event")
+        var clazz: OClass = otx.getMetadata.getSchema.getClass("Event")
+        if (clazz==null) clazz = otx.getMetadata.getSchema.createClass("Event")
         if (!clazz.getClusterIds.contains(id)) clazz.addClusterId(id)
         sender ! key
+        log.info("InitializeDbCluster " + key + " Done")
       }
       finally {
         db.close()

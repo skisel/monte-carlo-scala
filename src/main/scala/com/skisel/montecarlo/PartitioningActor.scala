@@ -8,6 +8,7 @@ import com.skisel.montecarlo.SimulationProtocol._
 import akka.pattern.ask
 import akka.util.Timeout
 import scala.util.Success
+import scala.concurrent.{Future, Await}
 
 
 class PartitioningActor extends Actor with akka.actor.ActorLogging {
@@ -26,8 +27,14 @@ class PartitioningActor extends Actor with akka.actor.ActorLogging {
       val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], sender, simulationRequest.numOfSimulations))
       storage.ask(InitializeCalculation(simulationRequest.numOfSimulations)).mapTo[String].onComplete {
         case Success(calculationId) => {
+          val eventPartitions: Iterator[IndexedSeq[Int]] = partitions(simulationRequest.numOfSimulations)
+          val initClustersFutures: Iterator[Future[Int]] =
+            for {part <- eventPartitions} yield {
+              storage.ask(InitializeDbCluster(part.head)).mapTo[Int]
+            }
+          Await.result(Future.sequence(initClustersFutures),timeout.duration)
           for (part <- partitions(simulationRequest.numOfSimulations)) {
-            actor.tell(SimulatePortfolioRequest(part.head, part.last, simulationRequest, calculationId),aggregator)
+            actor.tell(SimulatePortfolioRequest(part.head, part.last, simulationRequest, calculationId), aggregator)
           }
         }
         case x: Any => log.error("Unexpected message has been received: " + x)
@@ -41,7 +48,7 @@ class PartitioningActor extends Actor with akka.actor.ActorLogging {
         case Success(numOfSimulations: Int) => {
           val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], replyTo, numOfSimulations))
           for (part <- partitions(numOfSimulations)) {
-            actor.tell(LoadPortfolioRequest(part.head, loadRequest, loadRequest.calculationId, numOfSimulations),aggregator)
+            actor.tell(LoadPortfolioRequest(part.head, loadRequest, loadRequest.calculationId, numOfSimulations), aggregator)
           }
         }
         case x: Any => log.error("Unexpected message has been received: " + x)

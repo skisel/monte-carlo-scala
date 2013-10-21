@@ -28,13 +28,9 @@ class CalculationClient(req: Request) extends Actor with akka.actor.ActorLogging
         println("hitting ratio:" + responce.hittingRatio)
         println("simulation loss:" + responce.simulationLoss)
         println("simulation loss reduced:" + responce.simulationLossReduced)
-        context.system.shutdown()
-        context.system.awaitTermination()
       }
       case Success(x: Any) => log.error("Unexpected message has been received: " + x)
       case Failure(e: Throwable) => {
-        context.system.shutdown()
-        context.system.awaitTermination()
         log.error("Failed to get an answer", e)
       }
     }

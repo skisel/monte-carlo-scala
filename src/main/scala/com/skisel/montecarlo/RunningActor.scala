@@ -26,18 +26,21 @@ class RunningActor extends Actor with akka.actor.ActorLogging {
 
   def receive = {
     case portfolioRequest: SimulatePortfolioRequest => {
+      log.info("SimulatePortfolioRequest " + portfolioRequest)
       val sim = new MonteCarloSimulator(portfolioRequest.req.inp)
-      val events: List[Event] = simulation(portfolioRequest, sim)
       implicit val timeout = Timeout(60000)
-      Await.result(storage ask InitializeDbCluster(portfolioRequest.from),timeout.duration)
+      log.info("Simulate started: " + + portfolioRequest.from)
+      val events: List[Event] = simulation(portfolioRequest, sim)
+      log.info("Simulate ended: " + portfolioRequest.from)
       for (event <- events) {
         storage ! SaveEvent(event, portfolioRequest.from, portfolioRequest.calculationId)
         sender ! AggregationResults(event.eventId, applyStructure(event.losses), portfolioRequest)
       }
+      log.info("SimulatePortfolioRequest " + portfolioRequest + " Done")
     }
     case loadRequest: LoadPortfolioRequest => {
       implicit val timeout = Timeout(60000)
-      val events: List[Event] = Await.result(storage ask loadRequest,timeout.duration).asInstanceOf[List[Event]]
+      val events: List[Event] = Await.result(storage ask loadRequest, timeout.duration).asInstanceOf[List[Event]]
       for (event <- events) {
         sender ! AggregationResults(event.eventId, applyStructure(event.losses), loadRequest)
       }

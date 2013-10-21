@@ -12,7 +12,6 @@ libraryDependencies ++= Seq(
   "org.apache.commons" % "commons-math" % "2.2",
   "com.orientechnologies" % "orient-commons" % "1.5.1",
   "com.orientechnologies" % "orientdb-core" % "1.5.1",
-  "com.orientechnologies" % "orientdb-object" % "1.5.1",
   "com.orientechnologies" % "orientdb-client" % "1.5.1",
   "com.google.code.gson" % "gson" % "2.2.4",
   "com.typesafe.akka" %% "akka-testkit" % "2.2.1" % "test",
@@ -23,3 +22,8 @@ atmosSettings
 
 atmosTestSettings
 
+com.github.retronym.SbtOneJar.oneJarSettings
+
+ideaExcludeFolders += ".idea"
+
+ideaExcludeFolders += ".idea_modules"
