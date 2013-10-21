@@ -29,61 +29,49 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
     }
   }
 
+  def doInTransaction[T](f: ODatabaseDocumentTx => T) = {
+    val db: ODatabaseDocumentTx = otx.open(settings.dbUsername, settings.dbPassword)
+    try {
+      log.info("transaction open")
+      f(db)
+      log.info("transaction close")
+    } finally {
+      db.close()
+    }
+  }
+
   def receive = {
     case InitializeDbCluster(key: Int) => {
-      log.info("InitializeDbCluster " + key)
-      val db: ODatabaseDocumentTx = otx.open(settings.dbUsername, settings.dbPassword)
-      try {
-        val clusterName: String = "a" + key
-        var id: Integer = db.getClusterIdByName(clusterName)
-        if (id == (-1)) {
-          id = db.addCluster(clusterName, OStorage.CLUSTER_TYPE.PHYSICAL, null, null)
-        }
-        var clazz: OClass = otx.getMetadata.getSchema.getClass("Event")
-        if (clazz==null) clazz = otx.getMetadata.getSchema.createClass("Event")
+      doInTransaction((db: ODatabaseDocumentTx) => {
+        val id: Integer = getClusterId(db, "a" + key)
+        val clazz: OClass = getClazz
         if (!clazz.getClusterIds.contains(id)) clazz.addClusterId(id)
         sender ! key
-        log.info("InitializeDbCluster " + key + " Done")
-      }
-      finally {
-        db.close()
-      }
+      })
     }
     case InitializeCalculation(numOfSimulations: Int) => {
-      log.info("InitializeCalculation " + numOfSimulations)
-      val db: ODatabaseDocumentTx = otx.open(settings.dbUsername, settings.dbPassword)
-      try {
+      doInTransaction((db: ODatabaseDocumentTx) => {
         val doc: ODocument = db.newInstance()
         doc.field("@class", "Calculation")
         doc.field("numOfSimulations", numOfSimulations)
         db.save(doc)
         val identity: ORID = doc.getIdentity
         sender ! getCalculationId(identity)
-      }
-      finally {
-        db.close()
-      }
+      })
     }
 
     case LoadCalculation(calculationId: String) => {
-      log.info("LoadCalculation " + calculationId)
-      val db: ODatabaseDocumentTx = otx.open(settings.dbUsername, settings.dbPassword)
-      try {
+      doInTransaction((db: ODatabaseDocumentTx) => {
         val list: List[ODocument] = db.queryBySql("select from Calculation where @rid=?", calculationId)
         val field: Integer = list.head.field("numOfSimulations")
         sender ! field.toInt
-      }
-      finally {
-        db.close()
-      }
+      })
     }
 
+
     case SaveEvents(events: List[Event], key: Int, calculationId: String) => {
-      log.info("SaveEvents " + events.head.eventId)
-      val db: ODatabaseDocumentTx = otx.open(settings.dbUsername, settings.dbPassword)
-      db.declareIntent(new OIntentMassiveInsert())
-      try {
-        for(event <- events) {
+      doInTransaction((db: ODatabaseDocumentTx) => {
+        for (event <- events) {
           val doc: ODocument = db.newInstance()
           doc.field("@class", "Event")
           doc.field("eventId", event.eventId)
@@ -92,17 +80,12 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
           db.save(doc, "a" + key)
           1
         }
-      }
-      finally {
         db.declareIntent(null)
-        db.close()
-      }
-      log.info("SaveEvents " + events.head.eventId + " Done")
+      })
     }
+
     case LoadPortfolioRequest(key: Int, _, calculationKey: String, _) => {
-      log.info("LoadPortfolioRequest key:" + key + " calculationKey" + calculationKey)
-      val db: ODatabaseDocumentTx = otx.open(settings.dbUsername, settings.dbPassword)
-      try {
+      doInTransaction((db: ODatabaseDocumentTx) => {
         val result: List[ODocument] = db.queryBySql("select from cluster:a" + key + " where calculationId=?", calculationKey)
         sender ! (result map {
           x: ODocument => {
@@ -111,12 +94,24 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
             Event(eventId.toInt, losses.asScala.toList)
           }
         }).toList
-      }
-      finally {
-        db.close()
-      }
+      })
     }
     case x: Any => log.error("Unexpected message has been received: " + x)
+  }
+
+
+  def getClazz: OClass = {
+    var clazz: OClass = otx.getMetadata.getSchema.getClass("Event")
+    if (clazz == null) clazz = otx.getMetadata.getSchema.createClass("Event")
+    clazz
+  }
+
+  def getClusterId(db: ODatabaseDocumentTx, clusterName: String): Integer = {
+    var id: Integer = db.getClusterIdByName(clusterName)
+    if (id == (-1)) {
+      id = db.addCluster(clusterName, OStorage.CLUSTER_TYPE.PHYSICAL, null, null)
+    }
+    id
   }
 
   def getCalculationId(identity: ORID): String = {
