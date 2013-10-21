@@ -5,6 +5,7 @@ import com.skisel.montecarlo.SimulationProtocol._
 
 class MonteCarloResultAggregator(requestor: ActorRef, numberOfSimulations: Int) extends Actor with akka.actor.ActorLogging {
 
+  val settings = Settings(context.system)
   private[this] var outstandingRequests = Map.empty[Int, Double]
 
   def receive = {
@@ -14,7 +15,7 @@ class MonteCarloResultAggregator(requestor: ActorRef, numberOfSimulations: Int) 
         val distribution: List[Double] = outstandingRequests.toList.map(_._2).sorted
         val simulationLoss: Double = distribution.foldRight(0.0)(_ + _) / numberOfSimulations
         val reducedDistribution: List[Double] = reduceDistribution(distribution, numberOfSimulations)
-        val reducedSimulationLoss: Double = reducedDistribution.foldRight(0.0)(_ + _) / 1000
+        val reducedSimulationLoss: Double = reducedDistribution.foldRight(0.0)(_ + _) / settings.distributionResolution
         val hittingRatio: Double = distribution.count(_ > 0).toDouble / numberOfSimulations.toDouble
         val statistics: SimulationStatistics = SimulationStatistics(simulationLoss, reducedSimulationLoss, hittingRatio, reducedDistribution, request.calculationId)
         requestor ! statistics
@@ -26,7 +27,7 @@ class MonteCarloResultAggregator(requestor: ActorRef, numberOfSimulations: Int) 
 
 
   def reduceDistribution(distribution: List[Double], simulations: Int): List[Double] = {
-    val dropTo: Int = simulations / 1000
+    val dropTo: Int = simulations / settings.distributionResolution
     val avgFunction = {
       l: List[Double] => l.foldRight(0.0)(_ + _) / l.size
     }

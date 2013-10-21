@@ -13,11 +13,12 @@ import scala.concurrent.{Future, Await}
 
 class PartitioningActor extends Actor with akka.actor.ActorLogging {
 
+  val settings = Settings(context.system)
   val actor = context.actorOf(Props[RunningActor].withRouter(FromConfig), name = "runningActorRouter")
   val storage = context.actorOf(Props[StorageActor])
 
   def partitions(numOfSimulation: Int): List[IndexedSeq[Int]] = {
-    (1 to numOfSimulation).grouped(1000).toList
+    (1 to numOfSimulation).grouped(settings.partitionSize).toList
   }
 
   def receive = {

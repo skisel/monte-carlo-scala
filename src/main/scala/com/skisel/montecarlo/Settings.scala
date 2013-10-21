@@ -8,9 +8,11 @@ import akka.actor.ExtendedActorSystem
 import com.typesafe.config.Config
 
 class SettingsImpl(config: Config) extends Extension {
-  val DbUri: String = config.getString("monte-carlo-scala.db.uri")
-  val DbUsername: String = config.getString("monte-carlo-scala.db.username")
-  val DbPassword: String = config.getString("monte-carlo-scala.db.password")
+  val dbUri: String = config.getString("monte-carlo-scala.db.uri")
+  val dbUsername: String = config.getString("monte-carlo-scala.db.username")
+  val dbPassword: String = config.getString("monte-carlo-scala.db.password")
+  val partitionSize: Int = config.getInt("monte-carlo-scala.partition.size")
+  val distributionResolution: Int = config.getInt("monte-carlo-scala.distribution.resolution")
 
 }
 object Settings extends ExtensionId[SettingsImpl] with ExtensionIdProvider {

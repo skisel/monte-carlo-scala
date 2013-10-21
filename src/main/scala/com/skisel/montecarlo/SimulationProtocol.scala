@@ -37,7 +37,7 @@ object SimulationProtocol {
 
   case class InitializeDbCluster(key: Int)
 
-  case class SaveEvent(event: Event, key: Int, calculationId: String)
+  case class SaveEvents(events: List[Event], key: Int, calculationId: String)
 
   case class Event(eventId: Int, losses: List[Loss])
 
