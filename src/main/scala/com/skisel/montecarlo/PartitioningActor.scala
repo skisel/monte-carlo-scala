@@ -4,7 +4,9 @@ package com.skisel.montecarlo
 import language.postfixOps
 import akka.actor.{ActorRef, Actor, Props}
 import akka.routing.FromConfig
-import com.skisel.montecarlo.SimulationProtocol._
+import com.skisel.montecarlo.PartitioningProtocol._
+import com.skisel.montecarlo.SimulationProtocol.{LoadRequest, SimulationRequest}
+import com.skisel.montecarlo.StorageProtocol.{LoadCalculation, InitializeDbCluster, InitializeCalculation}
 import akka.pattern.ask
 import akka.util.Timeout
 import scala.util.Success

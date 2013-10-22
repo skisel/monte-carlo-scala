@@ -1,7 +1,8 @@
 package com.skisel.montecarlo
 
 import akka.actor.{ActorRef, Actor}
-import com.skisel.montecarlo.SimulationProtocol._
+import com.skisel.montecarlo.PartitioningProtocol._
+import com.skisel.montecarlo.SimulationProtocol.SimulationStatistics
 
 class MonteCarloResultAggregator(requestor: ActorRef, numberOfSimulations: Int) extends Actor with akka.actor.ActorLogging {
 

@@ -2,12 +2,13 @@ package com.skisel.montecarlo
 
 import akka.actor.{Props, Actor}
 import scala.collection.JavaConverters._
-import com.skisel.montecarlo.SimulationProtocol._
 import com.skisel.montecarlo.entity.Loss
-import akka.pattern.{ask, pipe}
+import akka.pattern.ask
 import akka.util.Timeout
-import scala.concurrent.{Await, Future}
-import scala.util.Success
+import scala.concurrent.Await
+import com.skisel.montecarlo.PartitioningProtocol._
+import com.skisel.montecarlo.StorageProtocol._
+import com.skisel.montecarlo.SimulationProtocol._
 
 class RunningActor extends Actor with akka.actor.ActorLogging {
 
@@ -47,7 +48,7 @@ class RunningActor extends Actor with akka.actor.ActorLogging {
     case x: Any => log.error("Unexpected message has been received: " + x)
   }
 
-  def simulation(portfolioRequest: SimulationProtocol.SimulatePortfolioRequest, sim: MonteCarloSimulator): List[Event] = {
+  def simulation(portfolioRequest: SimulatePortfolioRequest, sim: MonteCarloSimulator): List[Event] = {
     ((portfolioRequest.from to portfolioRequest.to) map {
       x => Event(x, simulation(portfolioRequest.req, sim))
     }).toList

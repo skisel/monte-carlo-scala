@@ -3,18 +3,15 @@ package com.skisel.montecarlo
 import akka.actor.Actor
 import com.skisel.montecarlo.entity.Loss
 import scala.collection.JavaConverters._
-import com.skisel.montecarlo.SimulationProtocol._
 import com.orientechnologies.orient.core.storage.OStorage
 import com.orientechnologies.orient.core.metadata.schema.OClass
 import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx
 import com.orientechnologies.orient.core.record.impl.ODocument
-import com.skisel.montecarlo.SimulationProtocol.LoadPortfolioRequest
-import com.skisel.montecarlo.SimulationProtocol.Event
-import com.skisel.montecarlo.SimulationProtocol.InitializeDbCluster
-import com.skisel.montecarlo.SimulationProtocol.SaveEvents
+import com.skisel.montecarlo.StorageProtocol._
 import com.orientechnologies.orient.core.id.ORID
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery
 import com.orientechnologies.orient.core.intent.OIntentMassiveInsert
+import com.skisel.montecarlo.PartitioningProtocol.LoadPortfolioRequest
 
 class StorageActor extends Actor with akka.actor.ActorLogging {
 
