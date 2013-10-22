@@ -39,11 +39,13 @@ class RunningActor extends Actor with akka.actor.ActorLogging {
       log.info("SimulatePortfolioRequest " + portfolioRequest + " Done")
     }
     case loadRequest: LoadPortfolioRequest => {
+      log.info("LoadPortfolioRequest " + loadRequest)
       implicit val timeout = Timeout(60000)
       val events: List[Event] = Await.result(storage ask loadRequest, timeout.duration).asInstanceOf[List[Event]]
       for (event <- events) {
         sender ! AggregationResults(event.eventId, applyStructure(event.losses), loadRequest)
       }
+      log.info("LoadPortfolioRequest " + loadRequest + " Done")
     }
     case x: Any => log.error("Unexpected message has been received: " + x)
   }

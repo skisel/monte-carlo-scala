@@ -89,6 +89,7 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
           x: ODocument => {
             val eventId: Integer = x.field("eventId")
             val losses: java.util.List[Loss] = Loss.fromJson(x.field("losses"))
+            x.reset()
             Event(eventId.toInt, losses.asScala.toList)
           }
         }).toList
