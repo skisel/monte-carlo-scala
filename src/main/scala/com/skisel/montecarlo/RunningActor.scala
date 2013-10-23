@@ -34,7 +34,7 @@ class RunningActor extends Actor with akka.actor.ActorLogging {
       log.info("Simulate ended: " + portfolioRequest.from)
       storage ! SaveEvents(events, portfolioRequest.from, portfolioRequest.calculationId)
       for (event <- events) {
-        sender ! AggregationResults(event.eventId, applyStructure(event.losses), portfolioRequest)
+        sender ! AggregationResults(event.eventId, applyStructure(event.losses), portfolioRequest.calculationId)
       }
       log.info("SimulatePortfolioRequest " + portfolioRequest + " Done")
     }
@@ -43,7 +43,7 @@ class RunningActor extends Actor with akka.actor.ActorLogging {
       implicit val timeout = Timeout(60000)
       val events: List[Event] = Await.result(storage ask loadRequest, timeout.duration).asInstanceOf[List[Event]]
       for (event <- events) {
-        sender ! AggregationResults(event.eventId, applyStructure(event.losses), loadRequest)
+        sender ! AggregationResults(event.eventId, applyStructure(event.losses), loadRequest.calculationId)
       }
       log.info("LoadPortfolioRequest " + loadRequest + " Done")
     }

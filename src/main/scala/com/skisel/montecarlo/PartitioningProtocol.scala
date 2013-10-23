@@ -23,6 +23,6 @@ object PartitioningProtocol {
 
   case class LoadPortfolioRequest(from: Int, req: LoadRequest, calculationId: String, numOfSimulations: Int) extends PortfolioRequest
 
-  case class AggregationResults(eventId: Int, amount: Double, req: PortfolioRequest)
+  case class AggregationResults(eventId: Int, amount: Double, calculationId: String)
 
 }

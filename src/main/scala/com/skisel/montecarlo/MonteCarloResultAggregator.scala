@@ -10,7 +10,7 @@ class MonteCarloResultAggregator(requestor: ActorRef, numberOfSimulations: Int) 
   private[this] var outstandingRequests = Map.empty[Int, Double]
 
   def receive = {
-    case AggregationResults(eventId: Int, amount: Double, request: PortfolioRequest) => {
+    case AggregationResults(eventId: Int, amount: Double, calculationId: String) => {
       outstandingRequests += eventId -> amount
       if (outstandingRequests.size == numberOfSimulations) {
         val distribution: List[Double] = outstandingRequests.toList.map(_._2).sorted
@@ -18,7 +18,7 @@ class MonteCarloResultAggregator(requestor: ActorRef, numberOfSimulations: Int) 
         val reducedDistribution: List[Double] = reduceDistribution(distribution, numberOfSimulations)
         val reducedSimulationLoss: Double = reducedDistribution.foldRight(0.0)(_ + _) / settings.distributionResolution
         val hittingRatio: Double = distribution.count(_ > 0).toDouble / numberOfSimulations.toDouble
-        val statistics: SimulationStatistics = SimulationStatistics(simulationLoss, reducedSimulationLoss, hittingRatio, reducedDistribution, request.calculationId)
+        val statistics: SimulationStatistics = SimulationStatistics(simulationLoss, reducedSimulationLoss, hittingRatio, reducedDistribution, calculationId)
         requestor ! statistics
         context.stop(self)
       }
