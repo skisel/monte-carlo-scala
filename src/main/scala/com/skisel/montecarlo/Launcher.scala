@@ -5,7 +5,6 @@ import com.typesafe.config.{Config, ConfigFactory}
 import akka.actor._
 import scala.collection.JavaConverters._
 import com.skisel.montecarlo.SimulationProtocol._
-import com.orientechnologies.orient.core.config.OGlobalConfiguration
 import java.net.InetAddress
 
 object Launcher {
@@ -56,8 +55,12 @@ object Launcher {
   }
 
   def clientConfig: Config = {
+    val port: Int = Option(System.getProperty("port")).getOrElse("0").toInt
+    val hostname: String = Option(System.getProperty("hostname")).getOrElse(InetAddress.getLocalHost.getHostName)
     ConfigFactory.empty
       .withFallback(ConfigFactory.parseString(s"atmos.trace.node = client"))
+      .withFallback(ConfigFactory.parseString(s"akka.remote.netty.tcp.hostname = $hostname"))
+      .withFallback(ConfigFactory.parseString(s"akka.remote.netty.tcp.port = $port"))
       .withFallback(ConfigFactory.load())
   }
 
