@@ -12,6 +12,8 @@ import com.orientechnologies.orient.core.id.ORID
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery
 import com.orientechnologies.orient.core.intent.OIntentMassiveInsert
 import com.skisel.montecarlo.PartitioningProtocol.LoadPortfolioRequest
+import scala.collection.immutable.IndexedSeq
+import java.util
 
 class StorageActor extends Actor with akka.actor.ActorLogging {
 
@@ -84,15 +86,16 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
 
     case LoadPortfolioRequest(key: Int, _, calculationKey: String, _) => {
       doInTransaction((db: ODatabaseDocumentTx) => {
-        val result: List[ODocument] = db.queryBySql("select from cluster:a" + key + " where calculationId=?", calculationKey)
-        sender ! (result map {
-          x: ODocument => {
-            val eventId: Integer = x.field("eventId")
-            val losses: java.util.List[Loss] = Loss.fromJson(x.field("losses"))
-            x.reset()
+        val queryResult: List[ODocument] = db.queryBySql(s"select from cluster:a$key where calculationId=$calculationKey")
+        val events: List[Event] = (queryResult map {
+          doc: ODocument => {
+            val eventId: Integer = doc.field("eventId")
+            val losses: util.List[Loss] = Loss.fromJson(doc.field("losses"))
+            doc.reset()
             Event(eventId.toInt, losses.asScala.toList)
           }
-        }).toList
+        })(collection.breakOut)
+        sender ! events
       })
     }
     case x: Any => log.error("Unexpected message has been received: " + x)

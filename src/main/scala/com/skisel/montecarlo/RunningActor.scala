@@ -53,6 +53,6 @@ class RunningActor extends Actor with akka.actor.ActorLogging {
   def simulation(portfolioRequest: SimulatePortfolioRequest, sim: MonteCarloSimulator): List[Event] = {
     ((portfolioRequest.from to portfolioRequest.to) map {
       x => Event(x, simulation(portfolioRequest.req, sim))
-    }).toList
+    })(collection.breakOut)
   }
 }
