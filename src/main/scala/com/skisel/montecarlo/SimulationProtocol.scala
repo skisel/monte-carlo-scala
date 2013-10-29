@@ -20,6 +20,8 @@ object SimulationProtocol {
 
   case class SimulationStatistics(simulationLoss: Double, simulationLossReduced: Double, hittingRatio: Double, reducedDistribution: List[Double], calculationId: String)
 
+  case class SimulationFailed(exception: Throwable)
+
 }
 
 

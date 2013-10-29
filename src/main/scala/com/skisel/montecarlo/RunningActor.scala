@@ -1,6 +1,6 @@
 package com.skisel.montecarlo
 
-import akka.actor.{Props, Actor}
+import akka.actor.{ActorRef, ActorPath, Props}
 import scala.collection.JavaConverters._
 import com.skisel.montecarlo.entity.Loss
 import akka.pattern.ask
@@ -9,8 +9,10 @@ import scala.concurrent.Await
 import com.skisel.montecarlo.PartitioningProtocol._
 import com.skisel.montecarlo.StorageProtocol._
 import com.skisel.montecarlo.SimulationProtocol._
+import com.skisel.workers.Worker
+import com.skisel.workers.MasterWorkerProtocol.CalculationCompleted
 
-class RunningActor extends Actor with akka.actor.ActorLogging {
+class RunningActor extends Worker with akka.actor.ActorLogging {
 
   val storage = context.actorOf(Props[StorageActor])
 
@@ -25,29 +27,26 @@ class RunningActor extends Actor with akka.actor.ActorLogging {
     losses.foldRight(0.0)(_.getAmount + _)
   }
 
-  def receive = {
-    case portfolioRequest: SimulatePortfolioRequest => {
-      log.info("SimulatePortfolioRequest " + portfolioRequest)
-      val sim = new MonteCarloSimulator(portfolioRequest.req.inp)
-      log.info("Simulate started: " + + portfolioRequest.from)
-      val events: List[Event] = simulation(portfolioRequest, sim)
-      log.info("Simulate ended: " + portfolioRequest.from)
-      storage ! SaveEvents(events, portfolioRequest.from, portfolioRequest.calculationId)
-      for (event <- events) {
-        sender ! AggregationResults(event.eventId, applyStructure(event.losses), portfolioRequest.calculationId)
+  def doWork(workSender: ActorRef, work: Any): Unit = {
+    work match {
+      case portfolioRequest: SimulatePortfolioRequest => {
+        val sim = new MonteCarloSimulator(portfolioRequest.req.inp)
+        val events: List[Event] = simulation(portfolioRequest, sim)
+        storage ! SaveEvents(events, portfolioRequest.from, portfolioRequest.calculationId)
+        for (event <- events) {
+          workSender ! AggregationResults(event.eventId, applyStructure(event.losses), portfolioRequest.calculationId)
+        }
+        self ! CalculationCompleted("Done")
       }
-      log.info("SimulatePortfolioRequest " + portfolioRequest + " Done")
-    }
-    case loadRequest: LoadPortfolioRequest => {
-      log.info("LoadPortfolioRequest " + loadRequest)
-      implicit val timeout = Timeout(60000)
-      val events: List[Event] = Await.result(storage ask loadRequest, timeout.duration).asInstanceOf[List[Event]]
-      for (event <- events) {
-        sender ! AggregationResults(event.eventId, applyStructure(event.losses), loadRequest.calculationId)
+      case loadRequest: LoadPortfolioRequest => {
+        implicit val timeout = Timeout(60000)
+        val events: List[Event] = Await.result(storage ask loadRequest, timeout.duration).asInstanceOf[List[Event]]
+        for (event <- events) {
+          workSender ! AggregationResults(event.eventId, applyStructure(event.losses), loadRequest.calculationId)
+        }
+        self ! CalculationCompleted("Done")
       }
-      log.info("LoadPortfolioRequest " + loadRequest + " Done")
     }
-    case x: Any => log.error("Unexpected message has been received: " + x)
   }
 
   def simulation(portfolioRequest: SimulatePortfolioRequest, sim: MonteCarloSimulator): List[Event] = {

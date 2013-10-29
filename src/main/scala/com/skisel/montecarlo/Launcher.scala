@@ -35,7 +35,7 @@ object Launcher {
   def seedConfig(): Config = {
     val port: Int = Option(System.getProperty("port")).getOrElse("2551").toInt
     val hostname: String = Option(System.getProperty("hostname")).getOrElse(InetAddress.getLocalHost.getHostName)
-    System.setProperty("akka.cluster.seed-nodes.0",s"akka.tcp://ClusterSystem@$hostname:$port")
+    System.setProperty("akka.cluster.seed-nodes.0", s"akka.tcp://ClusterSystem@$hostname:$port")
     ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$port")
       .withFallback(ConfigFactory.parseString("akka.cluster.roles = [compute]"))
       .withFallback(ConfigFactory.parseString(s"atmos.trace.node = seed $port"))
@@ -67,33 +67,34 @@ object Launcher {
 
   def seedRun() {
     val system = ActorSystem("ClusterSystem", seedConfig())
-    system.actorOf(Props[RunningActor], name = "runningActor")
-    system.actorOf(Props[PartitioningActor], name = "partitioningActor")
+    val partitioning: ActorRef = system.actorOf(Props(classOf[PartitioningActor]), name = "partitioningActor")
+    Thread.sleep(25000)
+    partitioning.tell(SimulateDealPortfolio(5000, new Input()), system.actorOf(Props(classOf[CalculationClient])))
   }
 
   def simulationRun(sims: Int) {
     val system = ActorSystem("ClusterSystem", seedConfig())
-    system.actorOf(Props[RunningActor], name = "runningActor")
-    system.actorOf(Props[PartitioningActor], name = "partitioningActor")
-    system.actorOf(Props(classOf[CalculationClient], SimulateDealPortfolio(sims, new Input())))
+    system.actorOf(Props(classOf[RunningActor]), name = "runningActor")
+    val partitioning: ActorRef = system.actorOf(Props(classOf[PartitioningActor]), name = "partitioningActor")
+    partitioning.tell(SimulateDealPortfolio(sims, new Input()), system.actorOf(Props(classOf[CalculationClient])))
   }
 
   def loadRun(key: String) {
     val system = ActorSystem("ClusterSystem", seedConfig())
-    system.actorOf(Props[RunningActor], name = "runningActor")
-    system.actorOf(Props[PartitioningActor], name = "partitioningActor")
-    system.actorOf(Props(classOf[CalculationClient], LoadRequest("#" + key)))
+    system.actorOf(Props(classOf[RunningActor]), name = "runningActor")
+    val partitioning: ActorRef = system.actorOf(Props(classOf[PartitioningActor]), name = "partitioningActor")
+    partitioning.tell(LoadRequest("#" + key), system.actorOf(Props(classOf[CalculationClient])))
   }
 
+  //todo
   def clientRun(req: Request) {
     val system = ActorSystem("ClusterSystem", clientConfig)
-    system.actorOf(Props(classOf[CalculationClient], req))
+    val partitioning: ActorRef = system.actorOf(Props(classOf[PartitioningActor]), name = "partitioningActor")
+    partitioning.tell(req, system.actorOf(Props(classOf[CalculationClient])))
   }
 
   def worker() {
-    val system = ActorSystem("ClusterSystem", workerConfig)
-    system.actorOf(Props[RunningActor], name = "runningActor")
-    system.actorOf(Props[PartitioningActor], name = "partitioningActor")
+    ActorSystem("ClusterSystem", workerConfig)
   }
 
 }

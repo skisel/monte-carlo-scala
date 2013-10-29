@@ -6,6 +6,7 @@ import akka.actor.ExtensionId
 import akka.actor.ExtensionIdProvider
 import akka.actor.ExtendedActorSystem
 import com.typesafe.config.Config
+import scala.collection.JavaConverters._
 
 class SettingsImpl(config: Config) extends Extension {
   val dbUri: String = config.getString("monte-carlo-scala.db.uri")
@@ -13,6 +14,7 @@ class SettingsImpl(config: Config) extends Extension {
   val dbPassword: String = config.getString("monte-carlo-scala.db.password")
   val partitionSize: Int = config.getInt("monte-carlo-scala.partition.size")
   val distributionResolution: Int = config.getInt("monte-carlo-scala.distribution.resolution")
+  val seedAddress: List[String] = config.getStringList("akka.cluster.seed-nodes").asScala.toList
 
 }
 object Settings extends ExtensionId[SettingsImpl] with ExtensionIdProvider {

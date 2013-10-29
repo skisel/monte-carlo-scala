@@ -9,6 +9,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % "2.2.3",
   "com.typesafe.akka" %% "akka-cluster" % "2.2.3",
   "com.typesafe.akka" %% "akka-remote" % "2.2.3",
+  "com.typesafe.akka" %% "akka-contrib" % "2.2.3",
   "org.apache.commons" % "commons-math" % "2.2",
   "com.orientechnologies" % "orient-commons" % "1.5.1",
   "com.orientechnologies" % "orientdb-core" % "1.5.1",
