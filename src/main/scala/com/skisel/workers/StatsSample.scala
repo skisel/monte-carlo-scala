@@ -5,12 +5,12 @@ import scala.concurrent.duration._
 import com.typesafe.config.ConfigFactory
 import akka.actor._
 import akka.contrib.pattern.ClusterSingletonManager
-import com.skisel.cluster._
-import LeaderNodeProtocol._
 import scala.Some
-import com.skisel.cluster.Leader
 import scala.reflect.classTag
-import com.skisel.workers.StatsProtocol.{WordsWork, CalculationJob}
+import com.skisel.cluster._
+import com.skisel.cluster.Leader
+import com.skisel.workers.StatsProtocol._
+import LeaderNodeProtocol._
 
 object StatsProtocol {
 
@@ -19,6 +19,10 @@ object StatsProtocol {
       text.split(" ").map(new WordsWork(_)).toList
     }
   }
+
+  case class CalculationResult(meanWordLength: Double)
+
+  case class CalculationFailed(reason: String)
 
   case class WordsWork(word: String) extends WorkUnit
 
@@ -90,6 +94,7 @@ class ClusterClient extends Actor {
   val facade = context.actorSelection("/user/facade")
 
   override def preStart(): Unit = {
+    import FacadeProtocol._
     val job: CalculationJob = new CalculationJob("this is the text")
     val aggregator = context.actorOf(Props(classOf[StatsAggregator], job.toWorkUnits.size, self))
     facade.tell(NotifyLeaderWhenAvailable(job), aggregator)

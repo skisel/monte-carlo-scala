@@ -6,11 +6,18 @@ import akka.actor._
 import akka.cluster.Cluster
 import akka.cluster.ClusterEvent._
 import akka.cluster.Member
-import LeaderNodeProtocol._
+
 import akka.actor.RootActorPath
+
+
+object FacadeProtocol {
+  case class NotifyLeader(msg: Any)
+  case class NotifyLeaderWhenAvailable(msg: Any)
+}
 
 //deployed to each cluster node
 class Facade extends Actor with ActorLogging {
+  import FacadeProtocol._
 
   val cluster = Cluster(context.system)
   // sort by age, oldest first

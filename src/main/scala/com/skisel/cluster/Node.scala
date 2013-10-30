@@ -2,16 +2,14 @@ package com.skisel.cluster
 
 import akka.actor.{Props, Actor, ActorLogging}
 import LeaderNodeProtocol._
+import FacadeProtocol._
 import scala.reflect.{ClassTag, classTag}
 
 //worker node
 class Node[P <: Actor : ClassTag] extends Actor with ActorLogging {
-
   val facade = context.actorSelection("/user/facade")
-
   def leaderMsg(msg: Any) = NotifyLeader(msg)
   def leaderMsgLater(msg: Any) = NotifyLeaderWhenAvailable(msg)
-
   def props: Props = Props(classTag[P].runtimeClass, self)
 
   override def preStart() = {

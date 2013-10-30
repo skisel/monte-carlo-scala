@@ -14,7 +14,7 @@ class Leader[P >: Actor: ClassTag] extends Actor with ActorLogging {
   context.actorOf(Props(classOf[Node[P]], classTag[P]).withRouter(FromConfig()), "nodeRouter")
 
   val nodes = mutable.Map.empty[ActorRef, Option[Tuple2[ActorRef, Any]]]
-  val workQueue = mutable.Queue.empty[Tuple2[ActorRef, Any]]
+  val workQueue = mutable.Queue.empty[Tuple2[ActorRef, WorkUnit]]
 
   def notifyNodes(): Unit = {
     if (!workQueue.isEmpty) {
