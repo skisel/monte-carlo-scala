@@ -6,12 +6,8 @@ import akka.actor._
 import akka.routing.FromConfig
 import LeaderNodeProtocol._
 import scala.reflect._
-import com.skisel.cluster.LeaderNodeProtocol.WorkerRequestsWork
-import com.skisel.cluster.LeaderNodeProtocol.WorkToBeDone
 import scala.Tuple2
-import com.skisel.cluster.LeaderNodeProtocol.WorkIsDone
 import akka.actor.Terminated
-import com.skisel.cluster.LeaderNodeProtocol.WorkerCreated
 import scala.Some
 
 class Leader[P >: Actor: ClassTag] extends Actor with ActorLogging {

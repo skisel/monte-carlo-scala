@@ -1,26 +1,19 @@
 package com.skisel.workers
 
 import language.postfixOps
-import scala.concurrent.forkjoin.ThreadLocalRandom
 import scala.concurrent.duration._
 import com.typesafe.config.ConfigFactory
 import akka.actor._
-import akka.cluster.Cluster
-import akka.cluster.ClusterEvent._
-import akka.cluster.MemberStatus
 import akka.contrib.pattern.ClusterSingletonManager
 import com.skisel.cluster._
 import LeaderNodeProtocol._
 import scala.Some
-import akka.actor.RootActorPath
-import akka.cluster.ClusterEvent.UnreachableMember
-import akka.cluster.ClusterEvent.MemberUp
 import com.skisel.cluster.Leader
-import akka.cluster.ClusterEvent.CurrentClusterState
 import scala.reflect.classTag
 import com.skisel.workers.StatsProtocol.{WordsWork, CalculationJob}
 
 object StatsProtocol {
+
   case class CalculationJob(text: String) extends JobTrigger {
     def toWorkUnits: List[WorkUnit] = {
       text.split(" ").map(new WordsWork(_)).toList
@@ -28,6 +21,7 @@ object StatsProtocol {
   }
 
   case class WordsWork(word: String) extends WorkUnit
+
 }
 
 class StatsAggregator(expectedResults: Int, replyTo: ActorRef) extends Actor {
@@ -66,7 +60,6 @@ class StatsProcessor(actorRef: ActorRef) extends Actor {
 }
 
 
-
 object StatsSampleOneMaster {
   def main(args: Array[String]): Unit = {
     val config =
@@ -78,7 +71,7 @@ object StatsSampleOneMaster {
     val system = ActorSystem("ClusterSystem", config)
 
     system.actorOf(ClusterSingletonManager.props(
-      singletonProps = _ ⇒ Props(classOf[Leader[StatsProcessor]],classTag[StatsProcessor]), singletonName = "leader",
+      singletonProps = _ ⇒ Props(classOf[Leader[StatsProcessor]], classTag[StatsProcessor]), singletonName = "leader",
       terminationMessage = PoisonPill, role = Some("compute")),
       name = "singleton")
     system.actorOf(Props[Facade], name = "facade")
@@ -88,51 +81,24 @@ object StatsSampleOneMaster {
 object StatsSampleOneMasterClient {
   def main(args: Array[String]): Unit = {
     val system = ActorSystem("ClusterSystem")
+    system.actorOf(Props[Facade], name = "facade")
     system.actorOf(Props(classOf[ClusterClient]), "client")
   }
 }
 
 class ClusterClient extends Actor {
-  val cluster = Cluster(context.system)
-  val servicePathElements = "/user/facade" match {
-    case RelativeActorPath(elements) ⇒ elements
-  }
-
-  import context.dispatcher
-
-  val tickTask = context.system.scheduler.scheduleOnce(10 seconds, self, "tick")
-
-  var nodes = Set.empty[Address]
+  val facade = context.actorSelection("/user/facade")
 
   override def preStart(): Unit = {
-    cluster.subscribe(self, classOf[MemberEvent])
-    cluster.subscribe(self, classOf[UnreachableMember])
-  }
-
-  override def postStop(): Unit = {
-    cluster.unsubscribe(self)
-    tickTask.cancel()
+    val job: CalculationJob = new CalculationJob("this is the text")
+    val aggregator = context.actorOf(Props(classOf[StatsAggregator], job.toWorkUnits.size, self))
+    facade.tell(NotifyLeaderWhenAvailable(job), aggregator)
   }
 
   def receive = {
-    case "tick" if nodes.nonEmpty ⇒
-      // just pick any one
-      val address = nodes.toIndexedSeq(ThreadLocalRandom.current.nextInt(nodes.size))
-      val service = context.actorSelection(RootActorPath(address) / servicePathElements)
-      val job: CalculationJob = new CalculationJob("this is the text")
-      val aggregator = context.actorOf(Props(classOf[StatsAggregator], job.toWorkUnits.size, self))
-      service.tell(job,aggregator)
     case result: CalculationResult ⇒
       println(result)
     case failed: CalculationFailed ⇒
       println(failed)
-    case state: CurrentClusterState ⇒
-      nodes = state.members.collect {
-        case m if m.hasRole("compute") && m.status == MemberStatus.Up ⇒ m.address
-      }
-    case MemberUp(m) if m.hasRole("compute") ⇒ nodes += m.address
-    case other: MemberEvent ⇒ nodes -= other.member.address
-    case UnreachableMember(m) ⇒ nodes -= m.address
   }
-
 }

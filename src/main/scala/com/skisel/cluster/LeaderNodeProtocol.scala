@@ -13,6 +13,8 @@ object LeaderNodeProtocol {
   // Messages to Workers
   case class NotifyLeader(msg: Any)
 
+  case class NotifyLeaderWhenAvailable(msg: Any)
+
   case class WorkToBeDone(work: Any)
 
   case object WorkIsReady
