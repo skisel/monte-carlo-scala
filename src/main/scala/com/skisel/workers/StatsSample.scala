@@ -1,7 +1,6 @@
 package com.skisel.workers
 
 import language.postfixOps
-import scala.collection.{mutable, immutable}
 import scala.concurrent.forkjoin.ThreadLocalRandom
 import scala.concurrent.duration._
 import com.typesafe.config.ConfigFactory
@@ -9,80 +8,27 @@ import akka.actor._
 import akka.cluster.Cluster
 import akka.cluster.ClusterEvent._
 import akka.cluster.MemberStatus
-import akka.cluster.Member
 import akka.contrib.pattern.ClusterSingletonManager
-import akka.routing.FromConfig
-import akka.cluster.ClusterEvent.MemberRemoved
-import MasterWorkerProtocol._
+import com.skisel.cluster._
+import LeaderNodeProtocol._
 import scala.Some
 import akka.actor.RootActorPath
 import akka.cluster.ClusterEvent.UnreachableMember
 import akka.cluster.ClusterEvent.MemberUp
-import com.skisel.workers.MasterWorkerProtocol.NotifyLeader
+import com.skisel.cluster.Leader
 import akka.cluster.ClusterEvent.CurrentClusterState
-import scala.Tuple2
+import scala.reflect.classTag
+import com.skisel.workers.StatsProtocol.{WordsWork, CalculationJob}
 
-class CalculationService extends Actor with ActorLogging {
-  context.actorOf(Props(classOf[StatsWorker]).withRouter(FromConfig), name = "workerRouter")
-
-  val workers = mutable.Map.empty[ActorRef, Option[Tuple2[ActorRef, Any]]]
-  val workQueue = mutable.Queue.empty[Tuple2[ActorRef, Any]]
-
-  def notifyWorkers(): Unit = {
-    if (!workQueue.isEmpty) {
-      workers.foreach {
-        case (worker, m) if m.isEmpty => worker ! WorkIsReady
-        case _ =>
-      }
+object StatsProtocol {
+  case class CalculationJob(text: String) extends JobTrigger {
+    def toWorkUnits: List[WorkUnit] = {
+      text.split(" ").map(new WordsWork(_)).toList
     }
   }
 
-  def receive = {
-    case WorkerCreated(worker) =>
-      log.info("Worker created: {}", worker)
-      context.watch(worker)
-      workers += (worker -> None)
-      notifyWorkers()
-
-    case WorkerRequestsWork(worker) =>
-      log.info("Worker requests work: {}", worker)
-      if (workers.contains(worker)) {
-        if (workQueue.isEmpty)
-          worker ! NoWorkToBeDone
-        else if (workers(worker) == None) {
-          val (workSender, work) = workQueue.dequeue()
-          workers += (worker -> Some(workSender -> work))
-          worker.tell(WorkToBeDone(work), workSender)
-        }
-      }
-
-    case WorkIsDone(worker) =>
-      if (!workers.contains(worker))
-        log.error("Blurgh! {} said it's done work but we didn't know about him", worker)
-      else
-        workers += (worker -> None)
-
-    case Terminated(worker) =>
-      if (workers.contains(worker) && workers(worker) != None) {
-        log.error("Blurgh! {} died while processing {}", worker, workers(worker))
-        val (workSender, work) = workers(worker).get
-        self.tell(work, workSender)
-      }
-      workers -= worker
-
-    case CalculationJob(text) if text != "" ⇒
-      log.info("Got job to process: {}", text)
-      val words = text.split(" ")
-      val replyTo = sender
-      val aggregator = context.actorOf(Props(classOf[StatsAggregator], words.size, replyTo))
-      words foreach {
-        word ⇒
-          workQueue.enqueue(aggregator -> word)
-      }
-      notifyWorkers()
-  }
+  case class WordsWork(word: String) extends WorkUnit
 }
-
 
 class StatsAggregator(expectedResults: Int, replyTo: ActorRef) extends Actor {
   var results = IndexedSeq.empty[Int]
@@ -102,57 +48,24 @@ class StatsAggregator(expectedResults: Int, replyTo: ActorRef) extends Actor {
   }
 }
 
-class StatsWorker extends Worker {
+class StatsProcessor(actorRef: ActorRef) extends Actor {
   var cache = Map.empty[String, Int]
 
-  def doWork(workSender: ActorRef, work: Any): Unit = {
-    work match {
-      case work: String ⇒
-        val length = cache.get(work) match {
-          case Some(x) ⇒ x
-          case None ⇒
-            val x = work.length
-            cache += (work -> x)
-            x
-        }
-        workSender ! length
-        self ! CalculationCompleted("Done")
-    }
-  }
-}
-
-class Facade extends Actor with ActorLogging {
-
-  val cluster = Cluster(context.system)
-  // sort by age, oldest first
-  val ageOrdering = Ordering.fromLessThan[Member] {
-    (a, b) ⇒ a.isOlderThan(b)
-  }
-  var membersByAge: immutable.SortedSet[Member] = immutable.SortedSet.empty(ageOrdering)
-  override def preStart(): Unit = cluster.subscribe(self, classOf[MemberEvent])
-  override def postStop(): Unit = cluster.unsubscribe(self)
-
   def receive = {
-    case notifyLeader: NotifyLeader =>
-      log.info("Notifying leader: {}", notifyLeader)
-      currentLeader.tell(notifyLeader.msg, sender)
-    case job: CalculationJob if membersByAge.isEmpty ⇒
-      sender ! CalculationFailed("Service unavailable, try again later")
-    case job: CalculationJob ⇒
-      currentLeader.tell(job, sender)
-    case state: CurrentClusterState ⇒
-      membersByAge = immutable.SortedSet.empty(ageOrdering) ++ state.members.collect {
-        case m if m.hasRole("compute") ⇒ m
+    case work: WordsWork ⇒
+      val length = cache.get(work.word) match {
+        case Some(x) ⇒ x
+        case None ⇒
+          val x = work.word.length
+          cache += (work.word -> x)
+          x
       }
-    case MemberUp(m) ⇒ if (m.hasRole("compute")) membersByAge += m
-    case MemberRemoved(m, _) ⇒ if (m.hasRole("compute")) membersByAge -= m
-    case _: MemberEvent ⇒ // not interesting
+      sender ! length
+      actorRef ! JobCompleted
   }
-
-  def currentLeader: ActorSelection =
-    context.actorSelection(RootActorPath(membersByAge.head.address) / "user" / "singleton" / "calculationService")
-
 }
+
+
 
 object StatsSampleOneMaster {
   def main(args: Array[String]): Unit = {
@@ -165,7 +78,7 @@ object StatsSampleOneMaster {
     val system = ActorSystem("ClusterSystem", config)
 
     system.actorOf(ClusterSingletonManager.props(
-      singletonProps = _ ⇒ Props[CalculationService], singletonName = "calculationService",
+      singletonProps = _ ⇒ Props(classOf[Leader[StatsProcessor]],classTag[StatsProcessor]), singletonName = "leader",
       terminationMessage = PoisonPill, role = Some("compute")),
       name = "singleton")
     system.actorOf(Props[Facade], name = "facade")
@@ -206,9 +119,9 @@ class ClusterClient extends Actor {
       // just pick any one
       val address = nodes.toIndexedSeq(ThreadLocalRandom.current.nextInt(nodes.size))
       val service = context.actorSelection(RootActorPath(address) / servicePathElements)
-      service ! CalculationJob("this is the text")
-      service ! CalculationJob("apple hello")
-      service ! CalculationJob("good morning")
+      val job: CalculationJob = new CalculationJob("this is the text")
+      val aggregator = context.actorOf(Props(classOf[StatsAggregator], job.toWorkUnits.size, self))
+      service.tell(job,aggregator)
     case result: CalculationResult ⇒
       println(result)
     case failed: CalculationFailed ⇒

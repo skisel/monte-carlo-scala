@@ -1,21 +1,36 @@
-package com.skisel.workers
+package com.skisel.cluster
 
 import akka.actor.ActorRef
 
-object MasterWorkerProtocol {
-  // Messages from Workers
+object LeaderNodeProtocol {
+
   case class WorkerCreated(worker: ActorRef)
+
   case class WorkerRequestsWork(worker: ActorRef)
+
   case class WorkIsDone(worker: ActorRef)
 
   // Messages to Workers
   case class NotifyLeader(msg: Any)
+
   case class WorkToBeDone(work: Any)
+
   case object WorkIsReady
+
   case object NoWorkToBeDone
 
-  case class CalculationJob(text: String)
   case class CalculationResult(meanWordLength: Double)
+
   case class CalculationFailed(reason: String)
-  case class CalculationCompleted(result: Any)
+
+  case object JobCompleted
+  case object JobFailed
+
+  trait WorkUnit
+
+  trait JobTrigger {
+    def toWorkUnits: List[WorkUnit]
+  }
+
+
 }

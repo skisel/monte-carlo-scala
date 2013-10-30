@@ -1,15 +1,17 @@
-package com.skisel.workers
+package com.skisel.cluster
 
-import akka.actor.{Actor, ActorLogging, ActorRef}
+import akka.actor.{Props, Actor, ActorLogging}
+import LeaderNodeProtocol._
+import scala.reflect.{ClassTag, classTag}
 
-abstract class Worker extends Actor with ActorLogging {
-  import MasterWorkerProtocol._
+
+class Node[P <: Actor : ClassTag] extends Actor with ActorLogging {
 
   val facade = context.actorSelection("/user/facade")
 
   def leaderMsg(msg: Any) = NotifyLeader(msg)
 
-  def doWork(workSender: ActorRef, work: Any): Unit
+  def props: Props = Props(classTag[P].runtimeClass, self)
 
   override def preStart() = {
     facade ! leaderMsg(WorkerCreated(self))
@@ -20,11 +22,18 @@ abstract class Worker extends Actor with ActorLogging {
     case NoWorkToBeDone =>
     case WorkToBeDone(_) =>
       log.error("Yikes. Master told me to do work, while I'm working.")
-    case CalculationCompleted(result) =>
-      log.info("Work is complete.  Result {}.", result)
+    case JobCompleted =>
+      log.info("Work is complete.")
       facade ! leaderMsg(WorkIsDone(self))
       facade ! leaderMsg(WorkerRequestsWork(self))
       context.become(idle)
+      context.stop(sender) //stop processor
+    case JobFailed =>
+      log.info("Work is complete.")
+      facade ! leaderMsg(WorkIsDone(self))
+      facade ! leaderMsg(WorkerRequestsWork(self))
+      context.become(idle)
+      context.stop(sender) //stop processor
   }
 
   def idle: Receive = {
@@ -33,7 +42,8 @@ abstract class Worker extends Actor with ActorLogging {
       facade ! leaderMsg(WorkerRequestsWork(self))
     case WorkToBeDone(work) =>
       log.info("Got work {}", work)
-      doWork(sender, work)
+      val processor = context.actorOf(props)
+      processor.tell(work,sender)
       context.become(working(work))
     case NoWorkToBeDone =>
   }

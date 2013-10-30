@@ -1,6 +1,6 @@
 package com.skisel.montecarlo
 
-import akka.actor.{ActorRef, ActorPath, Props}
+import akka.actor.{Actor, ActorRef, ActorPath, Props}
 import scala.collection.JavaConverters._
 import com.skisel.montecarlo.entity.Loss
 import akka.pattern.ask
@@ -9,10 +9,11 @@ import scala.concurrent.Await
 import com.skisel.montecarlo.PartitioningProtocol._
 import com.skisel.montecarlo.StorageProtocol._
 import com.skisel.montecarlo.SimulationProtocol._
-import com.skisel.workers.Worker
-import com.skisel.workers.MasterWorkerProtocol.CalculationCompleted
+import com.skisel.cluster.{LeaderNodeProtocol, Node}
+import com.skisel.cluster.Node
+import com.skisel.cluster.LeaderNodeProtocol.JobCompleted
 
-class RunningActor extends Worker with akka.actor.ActorLogging {
+class RunningActor extends Actor with akka.actor.ActorLogging {
 
   val storage = context.actorOf(Props[StorageActor])
 
@@ -36,7 +37,7 @@ class RunningActor extends Worker with akka.actor.ActorLogging {
         for (event <- events) {
           workSender ! AggregationResults(event.eventId, applyStructure(event.losses), portfolioRequest.calculationId)
         }
-        self ! CalculationCompleted("Done")
+        self ! JobCompleted
       }
       case loadRequest: LoadPortfolioRequest => {
         implicit val timeout = Timeout(60000)
@@ -44,7 +45,7 @@ class RunningActor extends Worker with akka.actor.ActorLogging {
         for (event <- events) {
           workSender ! AggregationResults(event.eventId, applyStructure(event.losses), loadRequest.calculationId)
         }
-        self ! CalculationCompleted("Done")
+        self ! JobCompleted
       }
     }
   }
@@ -54,4 +55,6 @@ class RunningActor extends Worker with akka.actor.ActorLogging {
       x => Event(x, simulation(portfolioRequest.req, sim))
     })(collection.breakOut)
   }
+
+  def receive: Actor.Receive = ???
 }
