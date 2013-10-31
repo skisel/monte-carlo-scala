@@ -1,4 +1,4 @@
-package com.skisel.workers
+package com.skisel.statsexample
 
 import language.postfixOps
 import scala.concurrent.duration._
@@ -9,7 +9,7 @@ import scala.Some
 import scala.reflect.classTag
 import com.skisel.cluster._
 import com.skisel.cluster.Leader
-import com.skisel.workers.StatsProtocol._
+import com.skisel.statsexample.StatsProtocol._
 import LeaderNodeProtocol._
 
 object StatsProtocol {

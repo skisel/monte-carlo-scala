@@ -12,7 +12,7 @@ import scala.reflect._
 import scala.Some
 import com.skisel.montecarlo.SimulationProtocol.SimulateDealPortfolio
 import com.skisel.montecarlo.SimulationProtocol.LoadRequest
-import com.skisel.workers.StatsProcessor
+import com.skisel.statsexample.StatsProcessor
 
 object Launcher {
   def main(args: Array[String]): Unit = {
