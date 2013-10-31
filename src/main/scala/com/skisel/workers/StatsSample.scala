@@ -30,7 +30,7 @@ object StatsProtocol {
 
 class StatsAggregator(expectedResults: Int, replyTo: ActorRef) extends Actor {
   var results = IndexedSeq.empty[Int]
-  context.setReceiveTimeout(3 seconds)
+  context.setReceiveTimeout(10 seconds)
 
   def receive = {
     case wordCount: Int ⇒

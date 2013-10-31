@@ -9,12 +9,22 @@ import scala.reflect._
 import scala.Tuple2
 import akka.actor.Terminated
 import scala.Some
+import akka.contrib.pattern.{DistributedPubSubExtension, DistributedPubSubMediator}
+import DistributedPubSubMediator.Publish
+import scala.concurrent.duration._
 
-class Leader[P >: Actor: ClassTag] extends Actor with ActorLogging {
+
+class Leader[P >: Actor : ClassTag] extends Actor with ActorLogging {
   context.actorOf(Props(classOf[Node[P]], classTag[P]).withRouter(FromConfig()), "nodeRouter")
-
+  val mediator = DistributedPubSubExtension(context.system).mediator
   val nodes = mutable.Map.empty[ActorRef, Option[Tuple2[ActorRef, Any]]]
   val workQueue = mutable.Queue.empty[Tuple2[ActorRef, WorkUnit]]
+  import context.dispatcher
+  val leaderPing = context.system.scheduler.schedule(1 seconds, 1 seconds, self, "tick")
+
+  override def postStop(): Unit = {
+    leaderPing.cancel()
+  }
 
   def notifyNodes(): Unit = {
     if (!workQueue.isEmpty) {
@@ -26,6 +36,8 @@ class Leader[P >: Actor: ClassTag] extends Actor with ActorLogging {
   }
 
   def receive = {
+    case "tick" =>
+      mediator ! Publish("leader", IAmTheLeader)
     case WorkerCreated(node) =>
       log.info("Node created: {}", node)
       context.watch(node)
