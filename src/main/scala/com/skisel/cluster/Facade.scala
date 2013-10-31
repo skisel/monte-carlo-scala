@@ -6,7 +6,6 @@ import akka.actor._
 
 import akka.contrib.pattern.{DistributedPubSubMediator, DistributedPubSubExtension}
 import akka.contrib.pattern.DistributedPubSubMediator.{SubscribeAck, Subscribe}
-import com.skisel.cluster.LeaderNodeProtocol.IAmTheLeader
 import akka.event.LoggingReceive
 
 
@@ -15,6 +14,8 @@ object FacadeProtocol {
   case class NotifyLeader(msg: Any)
 
   case class NotifyLeaderWhenAvailable(msg: Any)
+
+  case object IAmTheLeader
 
 }
 

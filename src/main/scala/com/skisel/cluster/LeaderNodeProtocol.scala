@@ -21,8 +21,6 @@ object LeaderNodeProtocol {
 
   case object JobFailed
 
-  case object IAmTheLeader
-
   trait WorkUnit
 
   trait JobTrigger {

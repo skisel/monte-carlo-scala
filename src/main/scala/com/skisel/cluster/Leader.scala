@@ -12,6 +12,7 @@ import scala.Some
 import akka.contrib.pattern.{DistributedPubSubExtension, DistributedPubSubMediator}
 import DistributedPubSubMediator.Publish
 import scala.concurrent.duration._
+import com.skisel.cluster.FacadeProtocol.IAmTheLeader
 
 
 class Leader[P >: Actor : ClassTag] extends Actor with ActorLogging {
