@@ -14,11 +14,7 @@ import LeaderNodeProtocol._
 
 object StatsProtocol {
 
-  case class CalculationJob(text: String) extends JobTrigger {
-    def toWorkUnits: List[WorkUnit] = {
-      text.split(" ").map(new WordsWork(_)).toList
-    }
-  }
+  case class CalculationJob(workUnits: List[WorkUnit]) extends CollectionJobMessage
 
   case class CalculationResult(meanWordLength: Double)
 
@@ -95,8 +91,8 @@ class ClusterClient extends Actor {
 
   override def preStart(): Unit = {
     import FacadeProtocol._
-    val job: CalculationJob = new CalculationJob("this is the text")
-    val aggregator = context.actorOf(Props(classOf[StatsAggregator], job.toWorkUnits.size, self))
+    val job: CalculationJob = new CalculationJob("this is the text".split(" ").map(new WordsWork(_)).toList)
+    val aggregator = context.actorOf(Props(classOf[StatsAggregator], job.workUnits.size, self))
     facade.tell(NotifyLeaderWhenAvailable(job), aggregator)
   }
 

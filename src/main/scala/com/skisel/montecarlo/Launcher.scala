@@ -6,6 +6,13 @@ import akka.actor._
 import scala.collection.JavaConverters._
 import com.skisel.montecarlo.SimulationProtocol._
 import java.net.InetAddress
+import akka.contrib.pattern.ClusterSingletonManager
+import com.skisel.cluster.{Facade, Leader}
+import scala.reflect._
+import scala.Some
+import com.skisel.montecarlo.SimulationProtocol.SimulateDealPortfolio
+import com.skisel.montecarlo.SimulationProtocol.LoadRequest
+import com.skisel.workers.StatsProcessor
 
 object Launcher {
   def main(args: Array[String]): Unit = {
@@ -13,8 +20,8 @@ object Launcher {
       case Nil => seedRun()
       case "seed" :: Nil => seedRun()
       case "worker" :: Nil => worker()
-      case "sim" :: xs :: Nil => simulationRun(xs.toInt)
-      case "load" :: xs :: Nil => loadRun(xs)
+      //case "sim" :: xs :: Nil => simulationRun(xs.toInt)
+      //case "load" :: xs :: Nil => loadRun(xs)
       case "client" :: Nil => println("please define operation")
       case "client" :: "sim" :: Nil => println("please define number of simulations")
       case "client" :: "sim" :: tail => {
@@ -64,37 +71,28 @@ object Launcher {
       .withFallback(ConfigFactory.load())
   }
 
-
   def seedRun() {
     val system = ActorSystem("ClusterSystem", seedConfig())
-    val partitioning: ActorRef = system.actorOf(Props(classOf[PartitioningActor]), name = "partitioningActor")
-    Thread.sleep(25000)
-    partitioning.tell(SimulateDealPortfolio(5000, new Input()), system.actorOf(Props(classOf[CalculationClient])))
+    system.actorOf(ClusterSingletonManager.props(
+      singletonProps = _ ⇒ Props(classOf[Leader[SimulationProcessor]], classTag[SimulationProcessor]), singletonName = "leader",
+      terminationMessage = PoisonPill, role = Some("compute")),
+      name = "singleton")
+    system.actorOf(Props[Facade], name = "facade")
   }
 
-  def simulationRun(sims: Int) {
-    val system = ActorSystem("ClusterSystem", seedConfig())
-    system.actorOf(Props(classOf[RunningActor]), name = "runningActor")
-    val partitioning: ActorRef = system.actorOf(Props(classOf[PartitioningActor]), name = "partitioningActor")
-    partitioning.tell(SimulateDealPortfolio(sims, new Input()), system.actorOf(Props(classOf[CalculationClient])))
-  }
-
-  def loadRun(key: String) {
-    val system = ActorSystem("ClusterSystem", seedConfig())
-    system.actorOf(Props(classOf[RunningActor]), name = "runningActor")
-    val partitioning: ActorRef = system.actorOf(Props(classOf[PartitioningActor]), name = "partitioningActor")
-    partitioning.tell(LoadRequest("#" + key), system.actorOf(Props(classOf[CalculationClient])))
-  }
-
-  //todo
   def clientRun(req: Request) {
     val system = ActorSystem("ClusterSystem", clientConfig)
-    val partitioning: ActorRef = system.actorOf(Props(classOf[PartitioningActor]), name = "partitioningActor")
-    partitioning.tell(req, system.actorOf(Props(classOf[CalculationClient])))
+    system.actorOf(Props[Facade], name = "facade")
+    system.actorOf(Props(classOf[CalculationClient],req))
   }
 
   def worker() {
-    ActorSystem("ClusterSystem", workerConfig)
+    val system: ActorSystem = ActorSystem("ClusterSystem", workerConfig)
+    system.actorOf(ClusterSingletonManager.props(
+      singletonProps = _ ⇒ Props(classOf[Leader[SimulationProcessor]], classTag[SimulationProcessor]), singletonName = "leader",
+      terminationMessage = PoisonPill, role = Some("compute")),
+      name = "singleton")
+    system.actorOf(Props[Facade], name = "facade")
   }
 
 }

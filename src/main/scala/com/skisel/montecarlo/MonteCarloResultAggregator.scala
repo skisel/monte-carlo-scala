@@ -3,8 +3,9 @@ package com.skisel.montecarlo
 import akka.actor.{ActorRef, Actor}
 import com.skisel.montecarlo.PartitioningProtocol._
 import com.skisel.montecarlo.SimulationProtocol.SimulationStatistics
+import com.skisel.cluster.LeaderNodeProtocol.JobCompleted
 
-class MonteCarloResultAggregator(requestor: ActorRef, numberOfSimulations: Int) extends Actor with akka.actor.ActorLogging {
+class MonteCarloResultAggregator(requestor: ActorRef, actorRef: ActorRef, numberOfSimulations: Int) extends Actor with akka.actor.ActorLogging {
 
   val settings = Settings(context.system)
   private[this] var outstandingRequests = Map.empty[Int, Double]
@@ -20,10 +21,10 @@ class MonteCarloResultAggregator(requestor: ActorRef, numberOfSimulations: Int) 
         val hittingRatio: Double = distribution.count(_ > 0).toDouble / numberOfSimulations.toDouble
         val statistics: SimulationStatistics = SimulationStatistics(simulationLoss, reducedSimulationLoss, hittingRatio, reducedDistribution, calculationId)
         requestor ! statistics
+        actorRef ! JobCompleted
         context.stop(self)
       }
     }
-    case x: Any => log.error("Unexpected message has been received: " + x)
   }
 
 

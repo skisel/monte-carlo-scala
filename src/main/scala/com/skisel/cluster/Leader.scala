@@ -20,7 +20,9 @@ class Leader[P >: Actor : ClassTag] extends Actor with ActorLogging {
   val mediator = DistributedPubSubExtension(context.system).mediator
   val nodes = mutable.Map.empty[ActorRef, Option[Tuple2[ActorRef, Any]]]
   val workQueue = mutable.Queue.empty[Tuple2[ActorRef, WorkUnit]]
+
   import context.dispatcher
+
   val leaderPing = context.system.scheduler.schedule(1 seconds, 1 seconds, self, "tick")
 
   override def postStop(): Unit = {
@@ -71,12 +73,24 @@ class Leader[P >: Actor : ClassTag] extends Actor with ActorLogging {
       }
       nodes -= node
 
-    case trigger: JobTrigger =>
-      log.info("Got job to process: {}", trigger)
+    case jobMessage: CollectionJobMessage =>
+      log.info("Got job to process: {}", jobMessage)
       val replyTo = sender
-      trigger.toWorkUnits.foreach {
+      jobMessage.workUnits.foreach {
         workUnit => workQueue.enqueue(replyTo -> workUnit)
       }
+      notifyNodes()
+
+    case item: ItemJobMessage =>
+      log.info("Got job to process: {}", item)
+      val replyTo = sender
+      workQueue.enqueue(replyTo -> item.workUnit)
+      notifyNodes()
+
+    case workUnit: WorkUnit =>
+      log.info("Got job to process: {}", workUnit)
+      val replyTo = sender
+      workQueue.enqueue(replyTo -> workUnit)
       notifyNodes()
   }
 }

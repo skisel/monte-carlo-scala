@@ -11,8 +11,38 @@ package com.skisel.montecarlo
 import language.postfixOps
 import akka.actor._
 import com.skisel.montecarlo.SimulationProtocol._
+import com.skisel.cluster.FacadeProtocol.NotifyLeaderWhenAvailable
+import com.skisel.cluster.LeaderNodeProtocol.WorkUnit
 
-class CalculationClient extends Actor with akka.actor.ActorLogging {
+object SimulationProtocol {
+
+  abstract class Request() extends WorkUnit{
+  }
+
+  abstract class SimulationRequest() extends Request {
+    def numOfSimulations: Int
+
+    def inp: Input
+  }
+
+  case class LoadRequest(calculationId: String) extends Request
+
+  case class SimulateDealPortfolio(numOfSimulations: Int, inp: Input) extends SimulationRequest
+
+  case class SimulateBackgroundPortfolio(numOfSimulations: Int, inp: Input) extends SimulationRequest
+
+  case class SimulationStatistics(simulationLoss: Double, simulationLossReduced: Double, hittingRatio: Double, reducedDistribution: List[Double], calculationId: String)
+
+  case class SimulationFailed(exception: Throwable)
+
+}
+
+class CalculationClient(req: Request) extends Actor with akka.actor.ActorLogging {
+  val facade = context.actorSelection("/user/facade")
+
+  override def preStart(): Unit = {
+      facade ! NotifyLeaderWhenAvailable(req)
+    }
 
   def receive = {
     case responce: SimulationStatistics => 

@@ -23,8 +23,12 @@ object LeaderNodeProtocol {
 
   trait WorkUnit
 
-  trait JobTrigger {
-    def toWorkUnits: List[WorkUnit]
+  trait CollectionJobMessage {
+    def workUnits: List[WorkUnit]
+  }
+
+  trait ItemJobMessage {
+    def workUnit: WorkUnit
   }
 
 }

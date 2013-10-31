@@ -1,6 +1,7 @@
 package com.skisel.montecarlo
 
 import com.skisel.montecarlo.SimulationProtocol._
+import com.skisel.cluster.LeaderNodeProtocol.WorkUnit
 
 /**
  * Created with IntelliJ IDEA.
@@ -11,7 +12,7 @@ import com.skisel.montecarlo.SimulationProtocol._
  */
 object PartitioningProtocol {
 
-  abstract class PortfolioRequest() {
+  abstract class PortfolioRequest() extends WorkUnit {
     def from: Int
 
     def req: Request
