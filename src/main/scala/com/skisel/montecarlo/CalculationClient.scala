@@ -13,6 +13,7 @@ import akka.actor._
 import com.skisel.montecarlo.SimulationProtocol._
 import com.skisel.cluster.FacadeProtocol.NotifyLeaderWhenAvailable
 import com.skisel.cluster.LeaderNodeProtocol.WorkUnit
+import akka.cluster.Cluster
 
 object SimulationProtocol {
 
@@ -51,7 +52,13 @@ class CalculationClient(req: Request) extends Actor with akka.actor.ActorLogging
       log.info("hitting ratio:" + responce.hittingRatio)
       log.info("simulation loss:" + responce.simulationLoss)
       log.info("simulation loss reduced:" + responce.simulationLossReduced)
+      val cluster: Cluster = Cluster(context.system)
+      cluster.leave(cluster.selfAddress)
+      context.system.shutdown()
     case failed: SimulationFailed =>
       log.error("simulation failed", failed.exception)
+      val cluster: Cluster = Cluster(context.system)
+      cluster.leave(cluster.selfAddress)
+      context.system.shutdown()
   }
 }
