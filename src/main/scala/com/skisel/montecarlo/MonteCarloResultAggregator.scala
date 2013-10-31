@@ -3,7 +3,7 @@ package com.skisel.montecarlo
 import akka.actor.{ActorRef, Actor}
 import com.skisel.montecarlo.PartitioningProtocol._
 import com.skisel.montecarlo.SimulationProtocol.{SimulationFailed, SimulationStatistics}
-import com.skisel.cluster.LeaderNodeProtocol.JobCompleted
+import com.skisel.cluster.LeaderNodeProtocol.{JobFailed, JobCompleted}
 
 class MonteCarloResultAggregator(requestor: ActorRef, actorRef: ActorRef, numberOfSimulations: Int) extends Actor with akka.actor.ActorLogging {
 
@@ -27,7 +27,7 @@ class MonteCarloResultAggregator(requestor: ActorRef, actorRef: ActorRef, number
     }
     case e: SimulationFailed =>
       requestor ! e
-      actorRef ! JobCompleted
+      actorRef ! JobFailed
       context.stop(self)
 
   }

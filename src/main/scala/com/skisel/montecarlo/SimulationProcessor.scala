@@ -6,8 +6,8 @@ import akka.actor.{OneForOneStrategy, ActorRef, Actor, Props}
 import com.skisel.montecarlo.SimulationProtocol._
 import akka.pattern.ask
 import akka.util.Timeout
-import scala.concurrent.{Future, Await}
-import com.skisel.cluster.LeaderNodeProtocol.JobCompleted
+import scala.concurrent._
+import com.skisel.cluster.LeaderNodeProtocol.{JobFailed, JobCompleted}
 import com.skisel.montecarlo.entity.Loss
 import com.skisel.montecarlo.StorageProtocol.SaveEvents
 import com.skisel.montecarlo.StorageProtocol.InitializeCalculation
@@ -24,6 +24,22 @@ import com.skisel.montecarlo.StorageProtocol.LoadCalculation
 import com.skisel.montecarlo.SimulationProtocol.LoadRequest
 import scala.collection.JavaConverters._
 import com.skisel.cluster.FacadeProtocol.NotifyLeader
+import com.skisel.montecarlo.StorageProtocol.SaveEvents
+import com.skisel.montecarlo.StorageProtocol.InitializeCalculation
+import com.skisel.montecarlo.SimulationProtocol.SimulateBackgroundPortfolio
+import scala.util.Failure
+import com.skisel.montecarlo.SimulationProtocol.SimulationFailed
+import com.skisel.montecarlo.PartitioningProtocol.AggregationResults
+import akka.actor.OneForOneStrategy
+import com.skisel.cluster.FacadeProtocol.NotifyLeader
+import com.skisel.montecarlo.PartitioningProtocol.SimulatePortfolioRequest
+import com.skisel.montecarlo.PartitioningProtocol.LoadPortfolioRequest
+import com.skisel.montecarlo.SimulationProtocol.SimulateDealPortfolio
+import com.skisel.montecarlo.StorageProtocol.Event
+import scala.util.Success
+import com.skisel.montecarlo.StorageProtocol.InitializeDbCluster
+import com.skisel.montecarlo.StorageProtocol.LoadCalculation
+import com.skisel.montecarlo.SimulationProtocol.LoadRequest
 
 class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.ActorLogging {
   val settings = Settings(context.system)
@@ -34,7 +50,7 @@ class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.Acto
   import scala.concurrent.duration._
   import akka.actor.SupervisorStrategy._
   override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries = 5, withinTimeRange = 1 minute) {
-    case _: java.sql.SQLException => Resume
+    case _: TimeoutException => Escalate
     case _: NullPointerException => Restart
     case _: Exception => Escalate
   }
@@ -81,7 +97,7 @@ class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.Acto
         }
         case Failure(e: Throwable) =>
           sender ! SimulationFailed(e)
-          actorRef ! JobCompleted
+          actorRef ! JobFailed
       }
     }
     case loadRequest: LoadRequest => {
@@ -97,7 +113,7 @@ class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.Acto
         }
         case Failure(e: Throwable) =>
           replyTo ! SimulationFailed(e)
-          actorRef ! JobCompleted
+          actorRef ! JobFailed
       }
     }
     case portfolioRequest: SimulatePortfolioRequest => {
@@ -110,15 +126,20 @@ class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.Acto
       actorRef ! JobCompleted
     }
     case loadRequest: LoadPortfolioRequest => {
-      implicit val timeout = Timeout(60000)
-      val events: List[Event] = Await.result(storage ask loadRequest, timeout.duration).asInstanceOf[List[Event]]
-      for (event <- events) {
-        sender ! AggregationResults(event.eventId, applyStructure(event.losses), loadRequest.calculationId)
+      try {
+        implicit val timeout = Timeout(60000)
+        val events: List[Event] = Await.result(storage ask loadRequest, timeout.duration).asInstanceOf[List[Event]]
+        for (event <- events) {
+          sender ! AggregationResults(event.eventId, applyStructure(event.losses), loadRequest.calculationId)
+        }
+        actorRef ! JobCompleted
       }
-      actorRef ! JobCompleted
+      catch {
+        case e:TimeoutException =>
+          sender ! SimulationFailed(e)
+          actorRef ! JobFailed
+      }
     }
-
-    case x: Any => log.error("Unexpected message has been received: " + x)
   }
 
 }

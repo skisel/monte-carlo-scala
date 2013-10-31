@@ -56,7 +56,7 @@ class CalculationClient(req: Request) extends Actor with akka.actor.ActorLogging
       cluster.leave(cluster.selfAddress)
       context.system.shutdown()
     case failed: SimulationFailed =>
-      log.error("simulation failed", failed.exception)
+      log.error(failed.exception, "simulation failed")
       val cluster: Cluster = Cluster(context.system)
       cluster.leave(cluster.selfAddress)
       context.system.shutdown()

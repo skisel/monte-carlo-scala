@@ -28,7 +28,7 @@ class Node[P <: Actor : ClassTag] extends Actor with ActorLogging {
       context.become(idle)
       context.stop(sender) //stop processor
     case JobFailed =>
-      log.info("Work is complete.")
+      log.info("Work failed.")
       facade ! leaderMsg(WorkIsDone(self))
       facade ! leaderMsg(WorkerRequestsWork(self))
       context.become(idle)
