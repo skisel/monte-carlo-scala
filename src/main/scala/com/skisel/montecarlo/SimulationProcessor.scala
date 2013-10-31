@@ -70,7 +70,9 @@ class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.Acto
             facade.tell(NotifyLeader(SimulatePortfolioRequest(part.head, part.last, simulationRequest, calculationId)), aggregator)
           }
         }
-        case Failure(e: Throwable) => sender ! SimulationFailed(e)
+        case Failure(e: Throwable) =>
+          sender ! SimulationFailed(e)
+          actorRef ! JobCompleted
       }
     }
     case loadRequest: LoadRequest => {
@@ -79,12 +81,14 @@ class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.Acto
       val replyTo = sender
       storage.ask(LoadCalculation(loadRequest.calculationId)).mapTo[Int].onComplete {
         case Success(numOfSimulations: Int) => {
-          val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], replyTo, numOfSimulations))
+          val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], replyTo, actorRef, numOfSimulations))
           for (part <- partitions(numOfSimulations)) {
             facade.tell(NotifyLeader(LoadPortfolioRequest(part.head, loadRequest, loadRequest.calculationId, numOfSimulations)), aggregator)
           }
         }
-        case Failure(e: Throwable) => replyTo ! SimulationFailed(e)
+        case Failure(e: Throwable) =>
+          replyTo ! SimulationFailed(e)
+          actorRef ! JobCompleted
       }
     }
     case portfolioRequest: SimulatePortfolioRequest => {
