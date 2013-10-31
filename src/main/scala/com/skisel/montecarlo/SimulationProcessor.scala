@@ -2,7 +2,7 @@ package com.skisel.montecarlo
 
 
 import language.postfixOps
-import akka.actor.{ActorRef, Actor, Props}
+import akka.actor.{OneForOneStrategy, ActorRef, Actor, Props}
 import com.skisel.montecarlo.SimulationProtocol._
 import akka.pattern.ask
 import akka.util.Timeout
@@ -25,11 +25,20 @@ import com.skisel.montecarlo.SimulationProtocol.LoadRequest
 import scala.collection.JavaConverters._
 import com.skisel.cluster.FacadeProtocol.NotifyLeader
 
-
 class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.ActorLogging {
   val settings = Settings(context.system)
   val storage = context.actorOf(Props[StorageActor])
   val facade = context.actorSelection("/user/facade")
+
+  /*
+  import scala.concurrent.duration._
+  import akka.actor.SupervisorStrategy._
+  override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries = 5, withinTimeRange = 1 minute) {
+    case _: java.sql.SQLException => Resume
+    case _: NullPointerException => Restart
+    case _: Exception => Escalate
+  }
+  */
 
   def partitions(numOfSimulation: Int): Iterator[IndexedSeq[Int]] = {
     (1 to numOfSimulation).grouped(settings.partitionSize)
