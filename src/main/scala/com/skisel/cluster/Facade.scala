@@ -4,7 +4,7 @@ import language.postfixOps
 import scala.collection.mutable
 import akka.actor._
 
-import akka.contrib.pattern.{DistributedPubSubMediator, DistributedPubSubExtension}
+import akka.contrib.pattern.DistributedPubSubExtension
 import akka.contrib.pattern.DistributedPubSubMediator.{SubscribeAck, Subscribe}
 import akka.event.LoggingReceive
 
@@ -60,9 +60,17 @@ class Facade extends Actor with ActorLogging {
     case SubscribeAck(Subscribe("leader", `self`)) ⇒
       log.info("Subscribe acknowledged")
     case IAmTheLeader =>
-      log.info("Leader is known {}", sender)
-      leader = Some(sender)
-      processTheQueue()
+      (leader, sender) match {
+        case (None, sender) =>
+          log.info("Leader is known now {}", sender)
+          leader = Some(sender)
+          processTheQueue()
+        case (Some(a), b) if a.path.equals(b.path) =>
+          //do nothing - leader is same
+        case (Some(a), sender) =>
+          log.info("Leader has changed {}", sender)
+          leader = Some(sender)
+      }
     case any: Any => log.info("got message: {}", any)
   }
 
