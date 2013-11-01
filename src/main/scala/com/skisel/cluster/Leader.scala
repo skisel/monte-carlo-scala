@@ -14,7 +14,6 @@ import DistributedPubSubMediator.Publish
 import scala.concurrent.duration._
 import com.skisel.cluster.FacadeProtocol.IAmTheLeader
 
-
 class Leader[P >: Actor : ClassTag] extends Actor with ActorLogging {
   context.actorOf(Props(classOf[Node[P]], classTag[P]).withRouter(FromConfig()), "nodeRouter")
   val mediator = DistributedPubSubExtension(context.system).mediator

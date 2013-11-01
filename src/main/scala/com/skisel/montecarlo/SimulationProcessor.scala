@@ -8,16 +8,15 @@ import scala.collection.JavaConverters._
 import scala.util.Failure
 import scala.util.Success
 import com.skisel.cluster.LeaderNodeProtocol.{JobFailed, JobCompleted}
-import com.skisel.cluster.FacadeProtocol.NotifyLeader
 import com.skisel.montecarlo.PartitioningProtocol._
 import com.skisel.montecarlo.SimulationProtocol._
 import com.skisel.montecarlo.StorageProtocol._
 import com.skisel.montecarlo.entity.Loss
+import com.skisel.cluster.FacadeConsumer
 
-class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.ActorLogging {
+class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.ActorLogging with FacadeConsumer {
   val settings = Settings(context.system)
   val storage = context.actorOf(Props[StorageActor])
-  val facade = context.actorSelection("/user/facade")
 
   /*
   import scala.concurrent.duration._
@@ -65,7 +64,7 @@ class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.Acto
             }
           Await.result(Future.sequence(initClustersFutures), timeout.duration)
           for (part <- eventPartitions) {
-            facade.tell(NotifyLeader(SimulatePortfolioRequest(part.head, part.last, simulationRequest, calculationId)), aggregator)
+            leaderMsg(SimulatePortfolioRequest(part.head, part.last, simulationRequest, calculationId), aggregator)
           }
         }
         case Failure(e: Throwable) =>
@@ -81,7 +80,7 @@ class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.Acto
         case Success(numOfSimulations: Int) => {
           val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], replyTo, actorRef, numOfSimulations))
           for (part <- partitions(numOfSimulations)) {
-            facade.tell(NotifyLeader(LoadPortfolioRequest(part.head, loadRequest, loadRequest.calculationId, numOfSimulations)), aggregator)
+            leaderMsg(LoadPortfolioRequest(part.head, loadRequest, loadRequest.calculationId, numOfSimulations), aggregator)
           }
         }
         case Failure(e: Throwable) =>

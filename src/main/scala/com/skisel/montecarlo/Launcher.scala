@@ -91,8 +91,7 @@ object Launcher {
 
 }
 
-
-object SaveInput {
+object SaveInputLauncher {
   class Handler extends Actor {
     def receive = {
       case id: String => println(id)

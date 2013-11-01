@@ -7,7 +7,17 @@ import akka.actor._
 import akka.contrib.pattern.DistributedPubSubExtension
 import akka.contrib.pattern.DistributedPubSubMediator.{SubscribeAck, Subscribe}
 import akka.event.LoggingReceive
+import com.skisel.cluster.FacadeProtocol.{NotifyLeaderWhenAvailable, NotifyLeader}
 
+
+trait FacadeConsumer {
+  this: Actor ⇒
+  private val facade = context.actorSelection("/user/facade")
+  def leaderMsg(msg: Any) = facade ! NotifyLeader(msg)
+  def leaderMsgLater(msg: Any) = facade ! NotifyLeaderWhenAvailable(msg)
+  def leaderMsg(msg: Any, sender: ActorRef) = facade.tell(NotifyLeader(msg),sender)
+  def leaderMsgLater(msg: Any, sender: ActorRef) = facade.tell(NotifyLeaderWhenAvailable(msg),sender)
+}
 
 object FacadeProtocol {
 
