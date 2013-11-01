@@ -10,7 +10,7 @@ import akka.event.LoggingReceive
 import com.skisel.cluster.FacadeProtocol.{NotifyLeaderWhenAvailable, NotifyLeader}
 
 
-trait FacadeConsumer {
+trait LeaderConsumer {
   this: Actor ⇒
   private val facade = context.actorSelection("/user/facade")
   def leaderMsg(msg: Any) = facade ! NotifyLeader(msg)

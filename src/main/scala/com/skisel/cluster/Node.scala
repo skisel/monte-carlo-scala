@@ -5,7 +5,7 @@ import LeaderNodeProtocol._
 import scala.reflect.{ClassTag, classTag}
 
 //worker node
-class Node[P <: Actor : ClassTag] extends Actor with ActorLogging with FacadeConsumer {
+class Node[P <: Actor : ClassTag] extends Actor with ActorLogging with LeaderConsumer {
   def props: Props = Props(classTag[P].runtimeClass, self)
 
   override def preStart() = {

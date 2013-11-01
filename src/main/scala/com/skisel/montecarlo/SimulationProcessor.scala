@@ -7,14 +7,16 @@ import scala.concurrent._
 import scala.collection.JavaConverters._
 import scala.util.Failure
 import scala.util.Success
-import com.skisel.cluster.LeaderNodeProtocol.{JobFailed, JobCompleted}
+import com.skisel.cluster.LeaderNodeProtocol.{CollectionJobMessage, WorkUnit, JobFailed, JobCompleted}
 import com.skisel.montecarlo.PartitioningProtocol._
 import com.skisel.montecarlo.SimulationProtocol._
 import com.skisel.montecarlo.StorageProtocol._
 import com.skisel.montecarlo.entity.Loss
-import com.skisel.cluster.FacadeConsumer
+import com.skisel.cluster.LeaderConsumer
 
-class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.ActorLogging with FacadeConsumer {
+case class Jobs(workUnits: List[WorkUnit]) extends CollectionJobMessage
+
+class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.ActorLogging with LeaderConsumer {
   val settings = Settings(context.system)
   val storage = context.actorOf(Props[StorageActor])
 
@@ -63,9 +65,10 @@ class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.Acto
               storage.ask(InitializeDbCluster(part.head)).mapTo[Int]
             }
           Await.result(Future.sequence(initClustersFutures), timeout.duration)
-          for (part <- eventPartitions) {
-            leaderMsg(SimulatePortfolioRequest(part.head, part.last, simulationRequest, calculationId), aggregator)
-          }
+          val jobs: List[SimulatePortfolioRequest] = eventPartitions map (
+            partition => SimulatePortfolioRequest(partition.head, partition.last, simulationRequest, calculationId)
+          )
+          leaderMsg(Jobs(jobs),aggregator)
         }
         case Failure(e: Throwable) =>
           sender ! SimulationFailed(e)
@@ -79,9 +82,10 @@ class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.Acto
       storage.ask(LoadCalculation(loadRequest.calculationId)).mapTo[Int].onComplete {
         case Success(numOfSimulations: Int) => {
           val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], replyTo, actorRef, numOfSimulations))
-          for (part <- partitions(numOfSimulations)) {
-            leaderMsg(LoadPortfolioRequest(part.head, loadRequest, loadRequest.calculationId, numOfSimulations), aggregator)
-          }
+          val jobs: List[LoadPortfolioRequest] = partitions(numOfSimulations).toList map (
+            partition => LoadPortfolioRequest(partition.head, loadRequest, loadRequest.calculationId, numOfSimulations)
+          )
+          leaderMsg(Jobs(jobs),aggregator)
         }
         case Failure(e: Throwable) =>
           replyTo ! SimulationFailed(e)
