@@ -1,45 +1,18 @@
 package com.skisel.montecarlo
 
-
-import language.postfixOps
-import akka.actor.{OneForOneStrategy, ActorRef, Actor, Props}
-import com.skisel.montecarlo.SimulationProtocol._
+import akka.actor.{ActorRef, Actor, Props}
 import akka.pattern.ask
 import akka.util.Timeout
 import scala.concurrent._
-import com.skisel.cluster.LeaderNodeProtocol.{JobFailed, JobCompleted}
-import com.skisel.montecarlo.entity.Loss
-import com.skisel.montecarlo.StorageProtocol.SaveEvents
-import com.skisel.montecarlo.StorageProtocol.InitializeCalculation
-import scala.util.Failure
-import com.skisel.montecarlo.SimulationProtocol.SimulationFailed
-import com.skisel.montecarlo.PartitioningProtocol.AggregationResults
-import com.skisel.montecarlo.PartitioningProtocol.SimulatePortfolioRequest
-import com.skisel.montecarlo.PartitioningProtocol.LoadPortfolioRequest
-import com.skisel.montecarlo.SimulationProtocol.SimulateDealPortfolio
-import com.skisel.montecarlo.StorageProtocol.Event
-import scala.util.Success
-import com.skisel.montecarlo.StorageProtocol.InitializeDbCluster
-import com.skisel.montecarlo.StorageProtocol.LoadCalculation
-import com.skisel.montecarlo.SimulationProtocol.LoadRequest
 import scala.collection.JavaConverters._
-import com.skisel.cluster.FacadeProtocol.NotifyLeader
-import com.skisel.montecarlo.StorageProtocol.SaveEvents
-import com.skisel.montecarlo.StorageProtocol.InitializeCalculation
-import com.skisel.montecarlo.SimulationProtocol.SimulateBackgroundPortfolio
 import scala.util.Failure
-import com.skisel.montecarlo.SimulationProtocol.SimulationFailed
-import com.skisel.montecarlo.PartitioningProtocol.AggregationResults
-import akka.actor.OneForOneStrategy
-import com.skisel.cluster.FacadeProtocol.NotifyLeader
-import com.skisel.montecarlo.PartitioningProtocol.SimulatePortfolioRequest
-import com.skisel.montecarlo.PartitioningProtocol.LoadPortfolioRequest
-import com.skisel.montecarlo.SimulationProtocol.SimulateDealPortfolio
-import com.skisel.montecarlo.StorageProtocol.Event
 import scala.util.Success
-import com.skisel.montecarlo.StorageProtocol.InitializeDbCluster
-import com.skisel.montecarlo.StorageProtocol.LoadCalculation
-import com.skisel.montecarlo.SimulationProtocol.LoadRequest
+import com.skisel.cluster.LeaderNodeProtocol.{JobFailed, JobCompleted}
+import com.skisel.cluster.FacadeProtocol.NotifyLeader
+import com.skisel.montecarlo.PartitioningProtocol._
+import com.skisel.montecarlo.SimulationProtocol._
+import com.skisel.montecarlo.StorageProtocol._
+import com.skisel.montecarlo.entity.Loss
 
 class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.ActorLogging {
   val settings = Settings(context.system)
