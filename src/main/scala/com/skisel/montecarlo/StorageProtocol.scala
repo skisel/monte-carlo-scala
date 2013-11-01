@@ -21,4 +21,8 @@ object StorageProtocol {
 
   case class LoadCalculation(calculationId: String)
 
+  case class LoadInput(inputId: String)
+
+  case class SaveInput(inp: Input)
+
 }

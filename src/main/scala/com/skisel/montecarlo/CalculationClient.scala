@@ -23,14 +23,14 @@ object SimulationProtocol {
   abstract class SimulationRequest() extends Request {
     def numOfSimulations: Int
 
-    def inp: Input
+    def inp: String
   }
 
   case class LoadRequest(calculationId: String) extends Request
 
-  case class SimulateDealPortfolio(numOfSimulations: Int, inp: Input) extends SimulationRequest
+  case class SimulateDealPortfolio(numOfSimulations: Int, inp: String) extends SimulationRequest
 
-  case class SimulateBackgroundPortfolio(numOfSimulations: Int, inp: Input) extends SimulationRequest
+  case class SimulateBackgroundPortfolio(numOfSimulations: Int, inp: String) extends SimulationRequest
 
   case class SimulationStatistics(simulationLoss: Double, simulationLossReduced: Double, hittingRatio: Double, reducedDistribution: List[Double], calculationId: String)
 

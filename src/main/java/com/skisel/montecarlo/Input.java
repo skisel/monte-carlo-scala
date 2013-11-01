@@ -1,9 +1,13 @@
 package com.skisel.montecarlo;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 import com.skisel.montecarlo.entity.Risk;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.List;
 
 public class Input implements Serializable {
 
@@ -789,4 +793,15 @@ public class Input implements Serializable {
     public ArrayList<Risk> getRisks() {
         return risks;
     }
+
+    public static String toJson(Input input) {
+        Gson gson = new Gson();
+        return gson.toJson(input);
+    }
+
+    public static Input fromJson(String json) {
+        Gson gson = new Gson();
+        return gson.fromJson(json, new TypeToken<Input>(){}.getType());
+    }
+
 }

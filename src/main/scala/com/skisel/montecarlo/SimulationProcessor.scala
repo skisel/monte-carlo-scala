@@ -90,13 +90,23 @@ class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.Acto
       }
     }
     case portfolioRequest: SimulatePortfolioRequest => {
-      val sim = new MonteCarloSimulator(portfolioRequest.req.inp)
-      val events: List[Event] = simulation(portfolioRequest, sim)
-      storage ! SaveEvents(events, portfolioRequest.from, portfolioRequest.calculationId)
-      for (event <- events) {
-        sender ! AggregationResults(event.eventId, applyStructure(event.losses), portfolioRequest.calculationId)
+      implicit val timeout = Timeout(30000)
+      import context.dispatcher
+      val replyTo = sender
+      storage.ask(LoadInput(portfolioRequest.req.inp)).mapTo[Input].onComplete {
+        case Success(inp: Input) => {
+          val sim = new MonteCarloSimulator(inp)
+          val events: List[Event] = simulation(portfolioRequest, sim)
+          storage ! SaveEvents(events, portfolioRequest.from, portfolioRequest.calculationId)
+          for (event <- events) {
+            replyTo ! AggregationResults(event.eventId, applyStructure(event.losses), portfolioRequest.calculationId)
+          }
+          actorRef ! JobCompleted
+        }
+        case Failure(e: Throwable) =>
+          replyTo ! SimulationFailed(e)
+          actorRef ! JobFailed
       }
-      actorRef ! JobCompleted
     }
     case loadRequest: LoadPortfolioRequest => {
       try {

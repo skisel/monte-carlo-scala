@@ -40,15 +40,31 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
   }
 
   def receive = {
-    case InitializeDbCluster(key: Int) => {
+    case LoadInput(key: String) =>
+      doInTransaction((db: ODatabaseDocumentTx) => {
+        val list: List[ODocument] = db.queryBySql("select from Input where @rid=?", key)
+        sender ! Input.fromJson(list.head.field("binary"))
+      })
+
+    case SaveInput(inp: Input) =>
+      doInTransaction((db: ODatabaseDocumentTx) => {
+        val doc: ODocument = db.newInstance()
+        doc.field("@class", "Input")
+        doc.field("binary", Input.toJson(inp))
+        db.save(doc)
+        val identity: ORID = doc.getIdentity
+        sender ! getCalculationId(identity)
+      })
+
+    case InitializeDbCluster(key: Int) =>
       doInTransaction((db: ODatabaseDocumentTx) => {
         val id: Integer = getClusterId(db, "a" + key)
         val clazz: OClass = getClazz
         if (!clazz.getClusterIds.contains(id)) clazz.addClusterId(id)
         sender ! key
       })
-    }
-    case InitializeCalculation(numOfSimulations: Int) => {
+
+    case InitializeCalculation(numOfSimulations: Int) =>
       doInTransaction((db: ODatabaseDocumentTx) => {
         val doc: ODocument = db.newInstance()
         doc.field("@class", "Calculation")
@@ -57,18 +73,15 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
         val identity: ORID = doc.getIdentity
         sender ! getCalculationId(identity)
       })
-    }
 
-    case LoadCalculation(calculationId: String) => {
+    case LoadCalculation(calculationId: String) =>
       doInTransaction((db: ODatabaseDocumentTx) => {
         val list: List[ODocument] = db.queryBySql("select from Calculation where @rid=?", calculationId)
         val field: Integer = list.head.field("numOfSimulations")
         sender ! field.toInt
       })
-    }
 
-
-    case SaveEvents(events: List[Event], key: Int, calculationId: String) => {
+    case SaveEvents(events: List[Event], key: Int, calculationId: String) =>
       doInTransaction((db: ODatabaseDocumentTx) => {
         db.declareIntent(new OIntentMassiveInsert)
         for (event <- events) {
@@ -82,9 +95,8 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
         }
         db.declareIntent(null)
       })
-    }
 
-    case LoadPortfolioRequest(key: Int, _, calculationKey: String, _) => {
+    case LoadPortfolioRequest(key: Int, _, calculationKey: String, _) =>
       doInTransaction((db: ODatabaseDocumentTx) => {
         val queryResult: List[ODocument] = db.queryBySql(s"select from cluster:a$key where calculationId=$calculationKey")
         val events: List[Event] = (queryResult map {
@@ -97,7 +109,7 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
         })(collection.breakOut)
         sender ! events
       })
-    }
+
     case x: Any => log.error("Unexpected message has been received: " + x)
   }
 

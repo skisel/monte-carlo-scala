@@ -32,12 +32,12 @@ public class Loss implements Serializable {
     }
 
     public static String toJson(List<Loss> losses) {
-        Gson gson = new GsonBuilder().create();
+        Gson gson = new Gson();
         return gson.toJson(losses);
     }
 
     public static List<Loss> fromJson(String losses) {
-        Gson gson = new GsonBuilder().create();
+        Gson gson = new Gson();
         return gson.fromJson(losses, new TypeToken<List<Loss>>(){}.getType());
     }
 

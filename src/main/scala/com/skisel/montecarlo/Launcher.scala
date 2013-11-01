@@ -3,7 +3,6 @@ package com.skisel.montecarlo
 import language.postfixOps
 import com.typesafe.config.{Config, ConfigFactory}
 import akka.actor._
-import scala.collection.JavaConverters._
 import com.skisel.montecarlo.SimulationProtocol._
 import java.net.InetAddress
 import akka.contrib.pattern.ClusterSingletonManager
@@ -12,7 +11,6 @@ import scala.reflect._
 import scala.Some
 import com.skisel.montecarlo.SimulationProtocol.SimulateDealPortfolio
 import com.skisel.montecarlo.SimulationProtocol.LoadRequest
-import com.skisel.statsexample.StatsProcessor
 
 object Launcher {
   def main(args: Array[String]): Unit = {
@@ -23,16 +21,12 @@ object Launcher {
       //case "sim" :: xs :: Nil => simulationRun(xs.toInt)
       //case "load" :: xs :: Nil => loadRun(xs)
       case "client" :: Nil => println("please define operation")
-      case "client" :: "sim" :: Nil => println("please define number of simulations")
-      case "client" :: "sim" :: tail => {
-        val inp = new Input()
-        println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
-        clientRun(SimulateDealPortfolio(tail.head.toInt, inp))
-      }
+      case "client" :: "sim" :: Nil => println("please define number of simulations and input id")
+      case "client" :: "sim" :: sims :: Nil => println("please define input id")
+      case "client" :: "sim" :: sims :: inputId :: Nil =>
+        clientRun(SimulateDealPortfolio(sims.toInt, "#" + inputId))
       case "client" :: "load" :: Nil => println("please define calculation key")
       case "client" :: "load" :: tail => {
-        val inp = new Input()
-        println("analytical loss: " + inp.getRisks.asScala.toList.map(x => x.getPd * x.getValue).foldRight(0.0)(_ + _))
         clientRun(LoadRequest("#" + tail.head))
       }
       case _ => println("error, unknown command: " + (args mkString " "))
@@ -83,7 +77,7 @@ object Launcher {
   def clientRun(req: Request) {
     val system = ActorSystem("ClusterSystem", clientConfig)
     system.actorOf(Props[Facade], name = "facade")
-    system.actorOf(Props(classOf[CalculationClient],req))
+    system.actorOf(Props(classOf[CalculationClient], req))
   }
 
   def worker() {
@@ -98,4 +92,18 @@ object Launcher {
 }
 
 
+object SaveInput {
+  class Handler extends Actor {
+    def receive = {
+      case id: String => println(id)
+    }
+  }
+
+  def main(args: Array[String]): Unit = {
+    val system = ActorSystem("ClusterSystem")
+    val storage: ActorRef = system.actorOf(Props[StorageActor])
+    val handler: ActorRef = system.actorOf(Props[Handler])
+    storage.tell(com.skisel.montecarlo.StorageProtocol.SaveInput(new Input), handler)
+  }
+}
 
