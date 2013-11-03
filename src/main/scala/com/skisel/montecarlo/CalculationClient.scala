@@ -1,19 +1,17 @@
 package com.skisel.montecarlo
 
 /**
- * Created with IntelliJ IDEA.
  * User: sergeykisel
  * Date: 16.10.13
  * Time: 21:57
- * To change this template use File | Settings | File Templates.
  */
 
 import language.postfixOps
 import akka.actor._
-import com.skisel.montecarlo.SimulationProtocol._
-import com.skisel.cluster.FacadeProtocol.NotifyLeaderWhenAvailable
-import com.skisel.cluster.LeaderNodeProtocol.WorkUnit
 import akka.cluster.Cluster
+import com.skisel.montecarlo.SimulationProtocol._
+import com.skisel.cluster.LeaderNodeProtocol.{ItemJobMessage, WorkUnit}
+import com.skisel.cluster.LeaderConsumer
 
 object SimulationProtocol {
 
@@ -36,13 +34,14 @@ object SimulationProtocol {
 
   case class SimulationFailed(exception: Throwable)
 
+  case class Calculation(workUnit: WorkUnit) extends ItemJobMessage
+
 }
 
-class CalculationClient(req: Request) extends Actor with akka.actor.ActorLogging {
-  val facade = context.actorSelection("/user/facade")
+class CalculationClient(req: Request) extends Actor with akka.actor.ActorLogging with LeaderConsumer {
 
   override def preStart(): Unit = {
-      facade ! NotifyLeaderWhenAvailable(req)
+      leaderMsgLater(Calculation(req))
     }
 
   def receive = {

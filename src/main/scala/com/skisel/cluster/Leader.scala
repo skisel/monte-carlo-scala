@@ -86,10 +86,5 @@ class Leader[P >: Actor : ClassTag] extends Actor with ActorLogging {
       workQueue.enqueue(replyTo -> item.workUnit)
       notifyNodes()
 
-    case workUnit: WorkUnit =>
-      log.info("Got job to process: {}", workUnit)
-      val replyTo = sender
-      workQueue.enqueue(replyTo -> workUnit)
-      notifyNodes()
   }
 }

@@ -86,14 +86,13 @@ object StatsSampleOneMasterClient {
   }
 }
 
-class ClusterClient extends Actor {
+class ClusterClient extends Actor with LeaderConsumer{
   val facade = context.actorSelection("/user/facade")
 
   override def preStart(): Unit = {
-    import FacadeProtocol._
     val job: CalculationJob = new CalculationJob("this is the text".split(" ").map(new WordsWork(_)).toList)
     val aggregator = context.actorOf(Props(classOf[StatsAggregator], job.workUnits.size, self))
-    facade.tell(NotifyLeaderWhenAvailable(job), aggregator)
+    leaderMsgLater(job, aggregator)
   }
 
   def receive = {

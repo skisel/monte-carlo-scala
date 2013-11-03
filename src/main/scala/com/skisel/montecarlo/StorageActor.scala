@@ -14,8 +14,9 @@ import com.orientechnologies.orient.core.intent.OIntentMassiveInsert
 import com.skisel.montecarlo.PartitioningProtocol.LoadPortfolioRequest
 import scala.collection.immutable.IndexedSeq
 import java.util
+import com.skisel.instruments.MetricsSender
 
-class StorageActor extends Actor with akka.actor.ActorLogging {
+class StorageActor extends Actor with akka.actor.ActorLogging with MetricsSender {
 
   val settings = Settings(context.system)
   val otx: ODatabaseDocumentTx = new ODatabaseDocumentTx(settings.dbUri)
@@ -31,15 +32,13 @@ class StorageActor extends Actor with akka.actor.ActorLogging {
   def doInTransaction[T](f: ODatabaseDocumentTx => T) = {
     val db: ODatabaseDocumentTx = otx.open(settings.dbUsername, settings.dbPassword)
     try {
-      log.info("transaction open")
       f(db)
-      log.info("transaction close")
     } finally {
       db.close()
     }
   }
 
-  def receive = {
+  def wrappedReceive = {
     case LoadInput(key: String) =>
       doInTransaction((db: ODatabaseDocumentTx) => {
         val list: List[ODocument] = db.queryBySql("select from Input where @rid=?", key)

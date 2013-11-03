@@ -5,7 +5,7 @@ import com.skisel.montecarlo.PartitioningProtocol._
 import com.skisel.montecarlo.SimulationProtocol.{SimulationFailed, SimulationStatistics}
 import com.skisel.cluster.LeaderNodeProtocol.{JobFailed, JobCompleted}
 
-class MonteCarloResultAggregator(requestor: ActorRef, actorRef: ActorRef, numberOfSimulations: Int) extends Actor with akka.actor.ActorLogging {
+class MonteCarloResultAggregator(requestor: ActorRef, node: ActorRef, numberOfSimulations: Int) extends Actor with akka.actor.ActorLogging {
 
   val settings = Settings(context.system)
   private[this] var outstandingRequests = Map.empty[Int, Double]
@@ -21,13 +21,13 @@ class MonteCarloResultAggregator(requestor: ActorRef, actorRef: ActorRef, number
         val hittingRatio: Double = distribution.count(_ > 0).toDouble / numberOfSimulations.toDouble
         val statistics: SimulationStatistics = SimulationStatistics(simulationLoss, reducedSimulationLoss, hittingRatio, reducedDistribution, calculationId)
         requestor ! statistics
-        actorRef ! JobCompleted
+        node ! JobCompleted
         context.stop(self)
       }
     }
     case e: SimulationFailed =>
       requestor ! e
-      actorRef ! JobFailed
+      node ! JobFailed
       context.stop(self)
 
   }

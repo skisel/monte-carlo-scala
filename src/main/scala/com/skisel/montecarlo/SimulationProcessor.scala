@@ -14,9 +14,7 @@ import com.skisel.montecarlo.StorageProtocol._
 import com.skisel.montecarlo.entity.Loss
 import com.skisel.cluster.LeaderConsumer
 
-case class Jobs(workUnits: List[WorkUnit]) extends CollectionJobMessage
-
-class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.ActorLogging with LeaderConsumer {
+class SimulationProcessor(node: ActorRef) extends Actor with akka.actor.ActorLogging with LeaderConsumer {
   val settings = Settings(context.system)
   val storage = context.actorOf(Props[StorageActor])
 
@@ -56,7 +54,7 @@ class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.Acto
     case simulationRequest: SimulationRequest => {
       implicit val timeout = Timeout(30000)
       import context.dispatcher
-      val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], sender, actorRef, simulationRequest.numOfSimulations))
+      val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], sender, node, simulationRequest.numOfSimulations))
       storage.ask(InitializeCalculation(simulationRequest.numOfSimulations)).mapTo[String].onComplete {
         case Success(calculationId) => {
           val eventPartitions: List[IndexedSeq[Int]] = partitions(simulationRequest.numOfSimulations).toList
@@ -68,11 +66,11 @@ class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.Acto
           val jobs: List[SimulatePortfolioRequest] = eventPartitions map (
             partition => SimulatePortfolioRequest(partition.head, partition.last, simulationRequest, calculationId)
           )
-          leaderMsg(Jobs(jobs),aggregator)
+          leaderMsg(CalculationPart(jobs),aggregator)
         }
         case Failure(e: Throwable) =>
           sender ! SimulationFailed(e)
-          actorRef ! JobFailed
+          node ! JobFailed
       }
     }
     case loadRequest: LoadRequest => {
@@ -81,15 +79,15 @@ class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.Acto
       val replyTo = sender
       storage.ask(LoadCalculation(loadRequest.calculationId)).mapTo[Int].onComplete {
         case Success(numOfSimulations: Int) => {
-          val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], replyTo, actorRef, numOfSimulations))
+          val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], replyTo, node, numOfSimulations))
           val jobs: List[LoadPortfolioRequest] = partitions(numOfSimulations).toList map (
             partition => LoadPortfolioRequest(partition.head, loadRequest, loadRequest.calculationId, numOfSimulations)
           )
-          leaderMsg(Jobs(jobs),aggregator)
+          leaderMsg(CalculationPart(jobs),aggregator)
         }
         case Failure(e: Throwable) =>
           replyTo ! SimulationFailed(e)
-          actorRef ! JobFailed
+          node ! JobFailed
       }
     }
     case portfolioRequest: SimulatePortfolioRequest => {
@@ -104,11 +102,11 @@ class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.Acto
           for (event <- events) {
             replyTo ! AggregationResults(event.eventId, applyStructure(event.losses), portfolioRequest.calculationId)
           }
-          actorRef ! JobCompleted
+          node ! JobCompleted
         }
         case Failure(e: Throwable) =>
           replyTo ! SimulationFailed(e)
-          actorRef ! JobFailed
+          node ! JobFailed
       }
     }
     case loadRequest: LoadPortfolioRequest => {
@@ -118,12 +116,12 @@ class SimulationProcessor(actorRef: ActorRef) extends Actor with akka.actor.Acto
         for (event <- events) {
           sender ! AggregationResults(event.eventId, applyStructure(event.losses), loadRequest.calculationId)
         }
-        actorRef ! JobCompleted
+        node ! JobCompleted
       }
       catch {
         case e:TimeoutException =>
           sender ! SimulationFailed(e)
-          actorRef ! JobFailed
+          node ! JobFailed
       }
     }
   }
