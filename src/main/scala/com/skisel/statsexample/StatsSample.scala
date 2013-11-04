@@ -16,9 +16,11 @@ object StatsProtocol {
 
   case class CalculationJob(workUnits: List[WorkUnit]) extends CollectionJobMessage
 
-  case class CalculationResult(meanWordLength: Double)
+  case class CalculationResult(meanWordLength: Double) extends JobCompleted
 
-  case class CalculationFailed(reason: String)
+  case class WorkResult(length: Int) extends JobCompleted
+
+  case class CalculationFailed(reason: String) extends JobFailed
 
   case class WordsWork(word: String) extends WorkUnit
 
@@ -54,8 +56,7 @@ class StatsProcessor(actorRef: ActorRef) extends Actor {
           cache += (work.word -> x)
           x
       }
-      sender ! length
-      actorRef ! JobCompleted
+      actorRef ! WorkResult(length)
   }
 }
 

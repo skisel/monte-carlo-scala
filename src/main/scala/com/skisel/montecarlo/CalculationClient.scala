@@ -9,34 +9,10 @@ package com.skisel.montecarlo
 import language.postfixOps
 import akka.actor._
 import akka.cluster.Cluster
-import com.skisel.montecarlo.SimulationProtocol._
-import com.skisel.cluster.LeaderNodeProtocol.{ItemJobMessage, WorkUnit}
 import com.skisel.cluster.LeaderConsumer
+import com.skisel.montecarlo.Messages._
 
-object SimulationProtocol {
 
-  abstract class Request() extends WorkUnit{
-  }
-
-  abstract class SimulationRequest() extends Request {
-    def numOfSimulations: Int
-
-    def inp: String
-  }
-
-  case class LoadRequest(calculationId: String) extends Request
-
-  case class SimulateDealPortfolio(numOfSimulations: Int, inp: String) extends SimulationRequest
-
-  case class SimulateBackgroundPortfolio(numOfSimulations: Int, inp: String) extends SimulationRequest
-
-  case class SimulationStatistics(simulationLoss: Double, simulationLossReduced: Double, hittingRatio: Double, reducedDistribution: List[Double], calculationId: String)
-
-  case class SimulationFailed(exception: Throwable)
-
-  case class Calculation(workUnit: WorkUnit) extends ItemJobMessage
-
-}
 
 class CalculationClient(req: Request) extends Actor with akka.actor.ActorLogging with LeaderConsumer {
 

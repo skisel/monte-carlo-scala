@@ -9,7 +9,7 @@ object LeaderNodeProtocol {
 
   case class WorkerRequestsWork(worker: ActorRef)
 
-  case class WorkIsDone(worker: ActorRef)
+  case class WorkIsDone(response: JobResponse, worker: ActorRef)
 
   case class WorkToBeDone(work: WorkUnit)
 
@@ -17,18 +17,21 @@ object LeaderNodeProtocol {
 
   case object NoWorkToBeDone
 
-  case object JobCompleted
-
-  case object JobFailed
-
   trait WorkUnit
 
-  trait CollectionJobMessage {
+
+  trait JobMessage
+
+  trait CollectionJobMessage extends JobMessage {
     def workUnits: List[WorkUnit]
   }
 
-  trait ItemJobMessage {
+  trait ItemJobMessage extends JobMessage {
     def workUnit: WorkUnit
   }
-
+  trait JobTrigger extends JobMessage
+  trait JobResponse extends JobMessage
+  trait JobFailed extends JobResponse
+  trait JobAcknowledged extends JobResponse
+  trait JobCompleted extends JobResponse
 }

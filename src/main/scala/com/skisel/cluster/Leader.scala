@@ -17,12 +17,16 @@ import com.skisel.cluster.FacadeProtocol.IAmTheLeader
 class Leader[P >: Actor : ClassTag] extends Actor with ActorLogging {
   context.actorOf(Props(classOf[Node[P]], classTag[P]).withRouter(FromConfig()), "nodeRouter")
   val mediator = DistributedPubSubExtension(context.system).mediator
-  val nodes = mutable.Map.empty[ActorRef, Option[Tuple2[ActorRef, Any]]]
-  val workQueue = mutable.Queue.empty[Tuple2[ActorRef, WorkUnit]]
+  val nodes = mutable.Map.empty[ActorRef, Option[(ActorRef, Any)]] //node -> requester -> work
+  val workQueue = mutable.Queue.empty[(ActorRef, WorkUnit)]
 
   import context.dispatcher
 
   val leaderPing = context.system.scheduler.schedule(1 seconds, 1 seconds, self, "tick")
+
+  override def preStart() = {
+    log.info("Starting leader at {}", self.path.toStringWithAddress(self.path.address))
+  }
 
   override def postStop(): Unit = {
     leaderPing.cancel()
@@ -58,11 +62,16 @@ class Leader[P >: Actor : ClassTag] extends Actor with ActorLogging {
         }
       }
 
-    case WorkIsDone(node) =>
-      if (!nodes.contains(node))
-        log.error("Blurgh! {} said it's done work but we didn't know about him", node)
-      else
-        nodes += (node -> None)
+    case WorkIsDone(msg, node) =>
+      nodes.get(node) match {
+        case Some(Some((requester, _))) =>
+          requester ! msg
+          nodes += (node -> None)
+        case Some(None) =>
+          log.error("Strange answer", node) //todo ???
+        case None =>
+          log.error("Blurgh! {} said it's done work but we didn't know about him", node)
+      }
 
     case Terminated(node) =>
       if (nodes.contains(node) && nodes(node) != None) {
@@ -74,16 +83,14 @@ class Leader[P >: Actor : ClassTag] extends Actor with ActorLogging {
 
     case jobMessage: CollectionJobMessage =>
       log.info("Got job to process: {}", jobMessage)
-      val replyTo = sender
       jobMessage.workUnits.foreach {
-        workUnit => workQueue.enqueue(replyTo -> workUnit)
+        workUnit => workQueue.enqueue(sender -> workUnit)
       }
       notifyNodes()
 
     case item: ItemJobMessage =>
       log.info("Got job to process: {}", item)
-      val replyTo = sender
-      workQueue.enqueue(replyTo -> item.workUnit)
+      workQueue.enqueue(sender -> item.workUnit)
       notifyNodes()
 
   }

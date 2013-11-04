@@ -3,14 +3,14 @@ package com.skisel.montecarlo
 import language.postfixOps
 import com.typesafe.config.{Config, ConfigFactory}
 import akka.actor._
-import com.skisel.montecarlo.SimulationProtocol._
 import java.net.InetAddress
 import akka.contrib.pattern.ClusterSingletonManager
 import com.skisel.cluster.{Facade, Leader}
 import scala.reflect._
 import scala.Some
-import com.skisel.montecarlo.SimulationProtocol.SimulateDealPortfolio
-import com.skisel.montecarlo.SimulationProtocol.LoadRequest
+import com.skisel.montecarlo.Messages.SimulateDealPortfolio
+import com.skisel.montecarlo.Messages.LoadRequest
+import com.skisel.montecarlo.Messages.Request
 
 object Launcher {
   def main(args: Array[String]): Unit = {

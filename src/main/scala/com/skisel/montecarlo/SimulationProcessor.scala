@@ -7,12 +7,15 @@ import scala.concurrent._
 import scala.collection.JavaConverters._
 import scala.util.Failure
 import scala.util.Success
-import com.skisel.cluster.LeaderNodeProtocol.{CollectionJobMessage, WorkUnit, JobFailed, JobCompleted}
-import com.skisel.montecarlo.PartitioningProtocol._
-import com.skisel.montecarlo.SimulationProtocol._
-import com.skisel.montecarlo.StorageProtocol._
-import com.skisel.montecarlo.entity.Loss
 import com.skisel.cluster.LeaderConsumer
+import com.skisel.montecarlo.Messages._
+import com.skisel.montecarlo.entity.Loss
+import com.skisel.montecarlo.StorageProtocol.SaveEvents
+import com.skisel.montecarlo.StorageProtocol.InitializeCalculation
+import com.skisel.montecarlo.StorageProtocol.Event
+import com.skisel.montecarlo.StorageProtocol.LoadInput
+import com.skisel.montecarlo.StorageProtocol.InitializeDbCluster
+import com.skisel.montecarlo.StorageProtocol.LoadCalculation
 
 class SimulationProcessor(node: ActorRef) extends Actor with akka.actor.ActorLogging with LeaderConsumer {
   val settings = Settings(context.system)
@@ -54,7 +57,7 @@ class SimulationProcessor(node: ActorRef) extends Actor with akka.actor.ActorLog
     case simulationRequest: SimulationRequest => {
       implicit val timeout = Timeout(30000)
       import context.dispatcher
-      val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], sender, node, simulationRequest.numOfSimulations))
+      val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], node, simulationRequest.numOfSimulations))
       storage.ask(InitializeCalculation(simulationRequest.numOfSimulations)).mapTo[String].onComplete {
         case Success(calculationId) => {
           val eventPartitions: List[IndexedSeq[Int]] = partitions(simulationRequest.numOfSimulations).toList
@@ -69,59 +72,53 @@ class SimulationProcessor(node: ActorRef) extends Actor with akka.actor.ActorLog
           leaderMsg(CalculationPart(jobs),aggregator)
         }
         case Failure(e: Throwable) =>
-          sender ! SimulationFailed(e)
-          node ! JobFailed
+          node ! SimulationFailed(e)
       }
     }
     case loadRequest: LoadRequest => {
       implicit val timeout = Timeout(30000)
       import context.dispatcher
-      val replyTo = sender
       storage.ask(LoadCalculation(loadRequest.calculationId)).mapTo[Int].onComplete {
         case Success(numOfSimulations: Int) => {
-          val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], replyTo, node, numOfSimulations))
+          val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], node, numOfSimulations))
           val jobs: List[LoadPortfolioRequest] = partitions(numOfSimulations).toList map (
             partition => LoadPortfolioRequest(partition.head, loadRequest, loadRequest.calculationId, numOfSimulations)
           )
           leaderMsg(CalculationPart(jobs),aggregator)
         }
         case Failure(e: Throwable) =>
-          replyTo ! SimulationFailed(e)
-          node ! JobFailed
+          node ! SimulationFailed(e)
       }
     }
     case portfolioRequest: SimulatePortfolioRequest => {
       implicit val timeout = Timeout(30000)
       import context.dispatcher
-      val replyTo = sender
-      storage.ask(LoadInput(portfolioRequest.req.inp)).mapTo[Input].onComplete {
+      storage.ask(LoadInput(portfolioRequest.req.inputId)).mapTo[Input].onComplete {
         case Success(inp: Input) => {
           val sim = new MonteCarloSimulator(inp)
           val events: List[Event] = simulation(portfolioRequest, sim)
           storage ! SaveEvents(events, portfolioRequest.from, portfolioRequest.calculationId)
-          for (event <- events) {
-            replyTo ! AggregationResults(event.eventId, applyStructure(event.losses), portfolioRequest.calculationId)
+          val results: List[AggregationResults] = events map {
+            event => AggregationResults(event.eventId, applyStructure(event.losses))
           }
-          node ! JobCompleted
+          node ! CalculationPartResult(results, portfolioRequest.calculationId)
         }
         case Failure(e: Throwable) =>
-          replyTo ! SimulationFailed(e)
-          node ! JobFailed
+          node ! SimulationFailed(e)
       }
     }
     case loadRequest: LoadPortfolioRequest => {
       try {
         implicit val timeout = Timeout(60000)
         val events: List[Event] = Await.result(storage ask loadRequest, timeout.duration).asInstanceOf[List[Event]]
-        for (event <- events) {
-          sender ! AggregationResults(event.eventId, applyStructure(event.losses), loadRequest.calculationId)
+        val results: List[AggregationResults] = events map {
+          event => AggregationResults(event.eventId, applyStructure(event.losses))
         }
-        node ! JobCompleted
+        node ! CalculationPartResult(results, loadRequest.calculationId)
       }
       catch {
         case e:TimeoutException =>
-          sender ! SimulationFailed(e)
-          node ! JobFailed
+          node ! SimulationFailed(e)
       }
     }
   }

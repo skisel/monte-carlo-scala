@@ -17,18 +17,21 @@ class Node[P <: Actor : ClassTag] extends Actor with ActorLogging with LeaderCon
     case NoWorkToBeDone =>
     case WorkToBeDone(_) =>
       log.error("Yikes. Master told me to do work, while I'm working.")
-    case JobCompleted =>
+    case ca: JobCompleted =>
       log.info("Work is complete.")
-      leaderMsg(WorkIsDone(self))
+      leaderMsg(WorkIsDone(ca, self))
       leaderMsg(WorkerRequestsWork(self))
       context.become(idle)
       context.stop(sender) //stop processor
-    case JobFailed =>
+    case ca: JobFailed =>
       log.info("Work failed.")
-      leaderMsg(WorkIsDone(self))
+      leaderMsg(WorkIsDone(ca, self))
       leaderMsg(WorkerRequestsWork(self))
       context.become(idle)
       context.stop(sender) //stop processor
+    case ca: JobAcknowledged =>
+      log.info("Job acknowledged.")
+      leaderMsg(ca)
   }
 
   def idle: Receive = {
@@ -38,7 +41,7 @@ class Node[P <: Actor : ClassTag] extends Actor with ActorLogging with LeaderCon
     case WorkToBeDone(work) =>
       log.info("Got work {}", work)
       val processor = context.actorOf(props)
-      processor.tell(work,sender)
+      processor ! work
       context.become(working(work))
     case NoWorkToBeDone =>
   }

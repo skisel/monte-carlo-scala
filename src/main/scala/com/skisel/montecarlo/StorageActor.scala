@@ -11,8 +11,7 @@ import com.skisel.montecarlo.StorageProtocol._
 import com.orientechnologies.orient.core.id.ORID
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery
 import com.orientechnologies.orient.core.intent.OIntentMassiveInsert
-import com.skisel.montecarlo.PartitioningProtocol.LoadPortfolioRequest
-import scala.collection.immutable.IndexedSeq
+import com.skisel.montecarlo.Messages.LoadPortfolioRequest
 import java.util
 import com.skisel.instruments.MetricsSender
 
