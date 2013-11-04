@@ -16,8 +16,9 @@ import com.skisel.montecarlo.StorageProtocol.Event
 import com.skisel.montecarlo.StorageProtocol.LoadInput
 import com.skisel.montecarlo.StorageProtocol.InitializeDbCluster
 import com.skisel.montecarlo.StorageProtocol.LoadCalculation
+import com.skisel.instruments.MetricsSender
 
-class SimulationProcessor(node: ActorRef) extends Actor with akka.actor.ActorLogging with LeaderConsumer {
+class SimulationProcessor(node: ActorRef) extends Actor with akka.actor.ActorLogging with LeaderConsumer with MetricsSender {
   val settings = Settings(context.system)
   val storage = context.actorOf(Props[StorageActor])
 
@@ -36,91 +37,66 @@ class SimulationProcessor(node: ActorRef) extends Actor with akka.actor.ActorLog
   }
 
   def simulation(request: SimulationRequest, sim: MonteCarloSimulator): List[Loss] = {
-      request match {
-        case SimulateDealPortfolio(_, _) => sim.simulateDeal().asScala.toList
-        case SimulateBackgroundPortfolio(_, _) => sim.simulateBackground().asScala.toList
-      }
+    request match {
+      case SimulateDealPortfolio(_, _) => sim.simulateDeal().asScala.toList
+      case SimulateBackgroundPortfolio(_, _) => sim.simulateBackground().asScala.toList
     }
+  }
 
-    def applyStructure(losses: List[Loss]): Double = {
-      losses.foldRight(0.0)(_.getAmount + _)
-    }
+  def applyStructure(losses: List[Loss]): Double = {
+    losses.foldRight(0.0)(_.getAmount + _)
+  }
 
-    def simulation(portfolioRequest: SimulatePortfolioRequest, sim: MonteCarloSimulator): List[Event] = {
-      ((portfolioRequest.from to portfolioRequest.to) map {
-        x => Event(x, simulation(portfolioRequest.req, sim))
-      })(collection.breakOut)
-    }
+  def simulation(portfolioRequest: SimulatePortfolioRequest, sim: MonteCarloSimulator): List[Event] = {
+    ((portfolioRequest.from to portfolioRequest.to) map {
+      x => Event(x, simulation(portfolioRequest.req, sim))
+    })(collection.breakOut)
+  }
 
 
-  def receive = {
-    case simulationRequest: SimulationRequest => {
+  def wrappedReceive = {
+    case simulationRequest: SimulationRequest =>
       implicit val timeout = Timeout(30000)
       import context.dispatcher
       val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], node, simulationRequest.numOfSimulations))
-      storage.ask(InitializeCalculation(simulationRequest.numOfSimulations)).mapTo[String].onComplete {
-        case Success(calculationId) => {
-          val eventPartitions: List[IndexedSeq[Int]] = partitions(simulationRequest.numOfSimulations).toList
-          val initClustersFutures: List[Future[Int]] =
-            for {part <- eventPartitions} yield {
-              storage.ask(InitializeDbCluster(part.head)).mapTo[Int]
-            }
-          Await.result(Future.sequence(initClustersFutures), timeout.duration)
-          val jobs: List[SimulatePortfolioRequest] = eventPartitions map (
-            partition => SimulatePortfolioRequest(partition.head, partition.last, simulationRequest, calculationId)
-          )
-          leaderMsg(CalculationPart(jobs),aggregator)
+      val calculationId: String = Await.result(storage.ask(InitializeCalculation(simulationRequest.numOfSimulations)).mapTo[String], timeout.duration)
+      val eventPartitions: List[IndexedSeq[Int]] = partitions(simulationRequest.numOfSimulations).toList
+      val initClustersFutures: List[Future[Int]] =
+        for {part <- eventPartitions} yield {
+          storage.ask(InitializeDbCluster(part.head)).mapTo[Int]
         }
-        case Failure(e: Throwable) =>
-          node ! SimulationFailed(e)
-      }
-    }
+      Await.result(Future.sequence(initClustersFutures), timeout.duration)
+      val jobs: List[SimulatePortfolioRequest] = eventPartitions map (
+        partition => SimulatePortfolioRequest(partition.head, partition.last, simulationRequest, calculationId)
+        )
+      leaderMsg(CalculationPart(jobs), aggregator)
     case loadRequest: LoadRequest => {
       implicit val timeout = Timeout(30000)
-      import context.dispatcher
-      storage.ask(LoadCalculation(loadRequest.calculationId)).mapTo[Int].onComplete {
-        case Success(numOfSimulations: Int) => {
-          val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], node, numOfSimulations))
-          val jobs: List[LoadPortfolioRequest] = partitions(numOfSimulations).toList map (
-            partition => LoadPortfolioRequest(partition.head, loadRequest, loadRequest.calculationId, numOfSimulations)
-          )
-          leaderMsg(CalculationPart(jobs),aggregator)
-        }
-        case Failure(e: Throwable) =>
-          node ! SimulationFailed(e)
-      }
+      val numOfSimulations: Int = Await.result(storage.ask(LoadCalculation(loadRequest.calculationId)).mapTo[Int], timeout.duration)
+      val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], node, numOfSimulations))
+      val jobs: List[LoadPortfolioRequest] = partitions(numOfSimulations).toList map (
+        partition => LoadPortfolioRequest(partition.head, loadRequest, loadRequest.calculationId, numOfSimulations)
+        )
+      leaderMsg(CalculationPart(jobs), aggregator)
     }
-    case portfolioRequest: SimulatePortfolioRequest => {
+    case portfolioRequest: SimulatePortfolioRequest =>
       implicit val timeout = Timeout(30000)
-      import context.dispatcher
-      storage.ask(LoadInput(portfolioRequest.req.inputId)).mapTo[Input].onComplete {
-        case Success(inp: Input) => {
-          val sim = new MonteCarloSimulator(inp)
-          val events: List[Event] = simulation(portfolioRequest, sim)
-          storage ! SaveEvents(events, portfolioRequest.from, portfolioRequest.calculationId)
-          val results: List[AggregationResults] = events map {
-            event => AggregationResults(event.eventId, applyStructure(event.losses))
-          }
-          node ! CalculationPartResult(results, portfolioRequest.calculationId)
-        }
-        case Failure(e: Throwable) =>
-          node ! SimulationFailed(e)
+      val future: Future[Input] = storage.ask(LoadInput(portfolioRequest.req.inputId)).mapTo[Input]
+      val inp: Input = Await.result(future, timeout.duration)
+      val sim = new MonteCarloSimulator(inp)
+      val events: List[Event] = simulation(portfolioRequest, sim)
+      storage ! SaveEvents(events, portfolioRequest.from, portfolioRequest.calculationId)
+      val results: List[AggregationResults] = events map {
+        event => AggregationResults(event.eventId, applyStructure(event.losses))
       }
-    }
-    case loadRequest: LoadPortfolioRequest => {
-      try {
-        implicit val timeout = Timeout(60000)
-        val events: List[Event] = Await.result(storage ask loadRequest, timeout.duration).asInstanceOf[List[Event]]
-        val results: List[AggregationResults] = events map {
-          event => AggregationResults(event.eventId, applyStructure(event.losses))
-        }
-        node ! CalculationPartResult(results, loadRequest.calculationId)
+      node ! CalculationPartResult(results, portfolioRequest.calculationId)
+    case loadRequest: LoadPortfolioRequest =>
+      implicit val timeout = Timeout(60000)
+      val events: List[Event] = Await.result(storage ask loadRequest, timeout.duration).asInstanceOf[List[Event]]
+      val results: List[AggregationResults] = events map {
+        event => AggregationResults(event.eventId, applyStructure(event.losses))
       }
-      catch {
-        case e:TimeoutException =>
-          node ! SimulationFailed(e)
-      }
-    }
+      node ! CalculationPartResult(results, loadRequest.calculationId)
   }
 
 }
