@@ -14,7 +14,7 @@ import com.skisel.montecarlo.StorageProtocol.Event
 import com.skisel.montecarlo.StorageProtocol.LoadInput
 import com.skisel.montecarlo.StorageProtocol.InitializeDbCluster
 import com.skisel.montecarlo.StorageProtocol.LoadCalculation
-import com.skisel.instruments.MetricsSender
+import com.skisel.instruments.metrics.MetricsSender
 
 class SimulationProcessor(node: ActorRef) extends Actor with akka.actor.ActorLogging with LeaderConsumer with MetricsSender {
   val settings = Settings(context.system)

@@ -13,8 +13,9 @@ import akka.contrib.pattern.{DistributedPubSubExtension, DistributedPubSubMediat
 import DistributedPubSubMediator.Publish
 import scala.concurrent.duration._
 import com.skisel.cluster.FacadeProtocol.IAmTheLeader
+import com.skisel.instruments.metrics.MetricsReceiver
 
-class Leader[P >: Actor : ClassTag] extends Actor with ActorLogging {
+class Leader[P >: Actor : ClassTag] extends Actor with ActorLogging with MetricsReceiver {
   context.actorOf(Props(classOf[Node[P]], classTag[P]).withRouter(FromConfig()), "nodeRouter")
   val mediator = DistributedPubSubExtension(context.system).mediator
   val nodes = mutable.Map.empty[ActorRef, Option[(ActorRef, Any)]] //node -> requester -> work
@@ -41,7 +42,7 @@ class Leader[P >: Actor : ClassTag] extends Actor with ActorLogging {
     }
   }
 
-  def receive = {
+  def wrappedReceive = {
     case "tick" =>
       mediator ! Publish("leader", IAmTheLeader)
     case WorkerCreated(node) =>

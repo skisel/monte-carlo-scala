@@ -2,7 +2,7 @@ package com.skisel.montecarlo
 
 import akka.actor.{ActorRef, Actor}
 import com.skisel.montecarlo.Messages._
-import com.skisel.instruments.MetricsSender
+import com.skisel.instruments.metrics.MetricsSender
 
 class MonteCarloResultAggregator(requestor: ActorRef, numberOfSimulations: Int) extends Actor with akka.actor.ActorLogging with MetricsSender{
 

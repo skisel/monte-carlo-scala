@@ -13,7 +13,7 @@ import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery
 import com.orientechnologies.orient.core.intent.OIntentMassiveInsert
 import com.skisel.montecarlo.Messages.LoadPortfolioRequest
 import java.util
-import com.skisel.instruments.MetricsSender
+import com.skisel.instruments.metrics.MetricsSender
 
 class StorageActor extends Actor with akka.actor.ActorLogging with MetricsSender {
 
