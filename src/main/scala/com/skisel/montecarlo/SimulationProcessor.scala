@@ -5,8 +5,6 @@ import akka.pattern.ask
 import akka.util.Timeout
 import scala.concurrent._
 import scala.collection.JavaConverters._
-import scala.util.Failure
-import scala.util.Success
 import com.skisel.cluster.LeaderConsumer
 import com.skisel.montecarlo.Messages._
 import com.skisel.montecarlo.entity.Loss
@@ -20,7 +18,8 @@ import com.skisel.instruments.MetricsSender
 
 class SimulationProcessor(node: ActorRef) extends Actor with akka.actor.ActorLogging with LeaderConsumer with MetricsSender {
   val settings = Settings(context.system)
-  val storage = context.actorOf(Props[StorageActor])
+  val storage = context.actorSelection("/user/storageActor")
+  implicit val timeout = Timeout(30000)
 
   /*
   import scala.concurrent.duration._
@@ -55,8 +54,12 @@ class SimulationProcessor(node: ActorRef) extends Actor with akka.actor.ActorLog
 
 
   def wrappedReceive = {
+    case AggregationRequest(events: List[Event], calculationId: String) =>
+      val results: List[AggregationResults] = events map {
+        event => AggregationResults(event.eventId, applyStructure(event.losses))
+      }
+      node ! CalculationPartResult(results, calculationId)
     case simulationRequest: SimulationRequest =>
-      implicit val timeout = Timeout(30000)
       import context.dispatcher
       val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], node, simulationRequest.numOfSimulations))
       val calculationId: String = Await.result(storage.ask(InitializeCalculation(simulationRequest.numOfSimulations)).mapTo[String], timeout.duration)
@@ -71,7 +74,6 @@ class SimulationProcessor(node: ActorRef) extends Actor with akka.actor.ActorLog
         )
       leaderMsg(CalculationPart(jobs), aggregator)
     case loadRequest: LoadRequest => {
-      implicit val timeout = Timeout(30000)
       val numOfSimulations: Int = Await.result(storage.ask(LoadCalculation(loadRequest.calculationId)).mapTo[Int], timeout.duration)
       val aggregator: ActorRef = context.actorOf(Props(classOf[MonteCarloResultAggregator], node, numOfSimulations))
       val jobs: List[LoadPortfolioRequest] = partitions(numOfSimulations).toList map (
@@ -80,23 +82,15 @@ class SimulationProcessor(node: ActorRef) extends Actor with akka.actor.ActorLog
       leaderMsg(CalculationPart(jobs), aggregator)
     }
     case portfolioRequest: SimulatePortfolioRequest =>
-      implicit val timeout = Timeout(30000)
       val future: Future[Input] = storage.ask(LoadInput(portfolioRequest.req.inputId)).mapTo[Input]
       val inp: Input = Await.result(future, timeout.duration)
       val sim = new MonteCarloSimulator(inp)
       val events: List[Event] = simulation(portfolioRequest, sim)
       storage ! SaveEvents(events, portfolioRequest.from, portfolioRequest.calculationId)
-      val results: List[AggregationResults] = events map {
-        event => AggregationResults(event.eventId, applyStructure(event.losses))
-      }
-      node ! CalculationPartResult(results, portfolioRequest.calculationId)
+      self ! AggregationRequest(events,portfolioRequest.calculationId)
     case loadRequest: LoadPortfolioRequest =>
-      implicit val timeout = Timeout(60000)
       val events: List[Event] = Await.result(storage ask loadRequest, timeout.duration).asInstanceOf[List[Event]]
-      val results: List[AggregationResults] = events map {
-        event => AggregationResults(event.eventId, applyStructure(event.losses))
-      }
-      node ! CalculationPartResult(results, loadRequest.calculationId)
+      self ! AggregationRequest(events,loadRequest.calculationId)
   }
 
 }

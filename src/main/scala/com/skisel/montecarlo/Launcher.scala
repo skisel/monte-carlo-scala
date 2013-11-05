@@ -72,6 +72,7 @@ object Launcher {
       terminationMessage = PoisonPill, role = Some("compute")),
       name = "singleton")
     system.actorOf(Props[Facade], name = "facade")
+    system.actorOf(Props[StorageActor], name="storageActor")
   }
 
   def clientRun(req: Request) {
@@ -86,6 +87,7 @@ object Launcher {
       singletonProps = _ ⇒ Props(classOf[Leader[SimulationProcessor]], classTag[SimulationProcessor]), singletonName = "leader",
       terminationMessage = PoisonPill, role = Some("compute")),
       name = "singleton")
+    system.actorOf(Props[StorageActor], name="storageActor")
     system.actorOf(Props[Facade], name = "facade")
   }
 

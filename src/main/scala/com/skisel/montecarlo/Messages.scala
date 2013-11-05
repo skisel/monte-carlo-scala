@@ -1,6 +1,7 @@
 package com.skisel.montecarlo
 
 import com.skisel.cluster.LeaderNodeProtocol._
+import com.skisel.montecarlo.StorageProtocol.Event
 
 /**
  * User: sergeykisel
@@ -41,6 +42,7 @@ object Messages {
 
   case class AggregationResults(eventId: Int, amount: Double)
 
+  case class AggregationRequest(events: List[Event], calculationId: String)
 
   case class CalculationPartResult(aggregations: List[AggregationResults], calculationId: String) extends JobCompleted
 

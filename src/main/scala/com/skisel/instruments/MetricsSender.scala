@@ -12,10 +12,14 @@ trait MetricsSender extends ActorStack with ActorLogging {
   override def receive: Receive = {
     case x =>
       val start: Long = System.currentTimeMillis()
-      log.info(s"start processing $x")
-      super.receive(x)
-      val time = System.currentTimeMillis() - start
-      log.info(s"stop processing $x ($time ms)")
+      val msg = x.getClass.getSimpleName
+      log.info(s"start processing $msg")
+      try
+        super.receive(x)
+      finally {
+        val time = System.currentTimeMillis() - start
+        log.info(s"stop processing $msg ($time ms)")
+      }
   }
 
 }

@@ -2,13 +2,14 @@ package com.skisel.montecarlo
 
 import akka.actor.{ActorRef, Actor}
 import com.skisel.montecarlo.Messages._
+import com.skisel.instruments.MetricsSender
 
-class MonteCarloResultAggregator(requestor: ActorRef, numberOfSimulations: Int) extends Actor with akka.actor.ActorLogging {
+class MonteCarloResultAggregator(requestor: ActorRef, numberOfSimulations: Int) extends Actor with akka.actor.ActorLogging with MetricsSender{
 
   val settings = Settings(context.system)
   private[this] var outstandingRequests = Map.empty[Int, Double]
 
-  def receive = {
+  def wrappedReceive = {
     case CalculationPartResult(aggregations: List[AggregationResults], calculationId: String) => {
       for (agg <- aggregations) {
         outstandingRequests += agg.eventId -> agg.amount
