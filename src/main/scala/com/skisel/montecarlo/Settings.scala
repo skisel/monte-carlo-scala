@@ -15,7 +15,6 @@ class SettingsImpl(config: Config) extends Extension {
   val partitionSize: Int = config.getInt("monte-carlo-scala.partition.size")
   val distributionResolution: Int = config.getInt("monte-carlo-scala.distribution.resolution")
   val seedAddress: List[String] = config.getStringList("akka.cluster.seed-nodes").asScala.toList
-
 }
 object Settings extends ExtensionId[SettingsImpl] with ExtensionIdProvider {
 

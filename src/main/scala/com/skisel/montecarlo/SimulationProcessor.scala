@@ -14,9 +14,11 @@ import com.skisel.montecarlo.StorageProtocol.Event
 import com.skisel.montecarlo.StorageProtocol.LoadInput
 import com.skisel.montecarlo.StorageProtocol.InitializeDbCluster
 import com.skisel.montecarlo.StorageProtocol.LoadCalculation
-import com.skisel.instruments.metrics.MetricsSender
+import com.skisel.instruments.metrics.{MetricsLevel, MetricsSender}
 
 class SimulationProcessor(node: ActorRef) extends Actor with akka.actor.ActorLogging with LeaderConsumer with MetricsSender {
+  def metricsLevel: MetricsLevel = MetricsLevel.APPLICATION
+
   val settings = Settings(context.system)
   val storage = context.actorSelection("/user/storageActor")
   implicit val timeout = Timeout(30000)

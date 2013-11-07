@@ -13,9 +13,10 @@ import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery
 import com.orientechnologies.orient.core.intent.OIntentMassiveInsert
 import com.skisel.montecarlo.Messages.LoadPortfolioRequest
 import java.util
-import com.skisel.instruments.metrics.MetricsSender
+import com.skisel.instruments.metrics.{MetricsLevel, MetricsSender}
 
 class StorageActor extends Actor with akka.actor.ActorLogging with MetricsSender {
+  def metricsLevel: MetricsLevel = MetricsLevel.DATABASE
 
   val settings = Settings(context.system)
   val otx: ODatabaseDocumentTx = new ODatabaseDocumentTx(settings.dbUri)

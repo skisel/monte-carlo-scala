@@ -11,16 +11,18 @@ import akka.actor._
 import akka.cluster.Cluster
 import com.skisel.cluster.LeaderConsumer
 import com.skisel.montecarlo.Messages._
+import com.skisel.instruments.metrics.{MetricsLevel, MetricsSender}
 
 
+class CalculationClient(req: Request) extends Actor with akka.actor.ActorLogging with LeaderConsumer with MetricsSender {
 
-class CalculationClient(req: Request) extends Actor with akka.actor.ActorLogging with LeaderConsumer {
+  def metricsLevel: MetricsLevel = MetricsLevel.APPLICATION
 
   override def preStart(): Unit = {
       leaderMsgLater(Calculation(req))
     }
 
-  def receive = {
+  def wrappedReceive = {
     case responce: SimulationStatistics => 
       log.info(responce.reducedDistribution.mkString("\n"))
       log.info("calculation id: " + responce.calculationId)

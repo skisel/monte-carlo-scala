@@ -2,7 +2,7 @@ package com.skisel.montecarlo
 
 import akka.actor.{ActorRef, Actor}
 import com.skisel.montecarlo.Messages._
-import com.skisel.instruments.metrics.MetricsSender
+import com.skisel.instruments.metrics.{MetricsLevel, MetricsSender}
 
 class MonteCarloResultAggregator(requestor: ActorRef, numberOfSimulations: Int) extends Actor with akka.actor.ActorLogging with MetricsSender{
 
@@ -38,4 +38,6 @@ class MonteCarloResultAggregator(requestor: ActorRef, numberOfSimulations: Int) 
     }
     distribution.grouped(dropTo).map(avgFunction).toList
   }
+
+  def metricsLevel: MetricsLevel = MetricsLevel.APPLICATION
 }
